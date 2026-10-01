@@ -96,6 +96,9 @@ public class Carga {
 			throw new RegraNegocioException(
 					"Transição de status inválida: %s -> %s".formatted(status, novoStatus));
 		}
+		if (novoStatus == StatusCarga.OCORRENCIA && (motivo == null || motivo.isBlank())) {
+			throw new RegraNegocioException("Motivo é obrigatório para registrar ocorrência");
+		}
 		historico.add(new HistoricoStatus(this, status, novoStatus, motivo));
 		status = novoStatus;
 	}

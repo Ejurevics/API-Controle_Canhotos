@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 
 import br.com.controlecanhotos.coleta.Coleta;
+import br.com.controlecanhotos.historico.HistoricoStatus;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 
 class CargaTest {
@@ -51,8 +52,40 @@ class CargaTest {
 	}
 
 	@Test
-	void statusFinaisNaoPermitemTransicao() {
-		assertThat(StatusCarga.ENTREGUE.proximosPermitidos()).isEmpty();
+	void ocorrenciaSemMotivoLancaExcecao() {
+		Carga carga = novaCarga();
+
+		assertThatThrownBy(() -> carga.alterarStatus(StatusCarga.OCORRENCIA, " "))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessageContaining("Motivo");
+		assertThat(carga.getStatus()).isEqualTo(StatusCarga.AGUARDANDO_COLETA);
+	}
+
+	@Test
+	void cargaEntregueSoRetrocedePorOcorrencia() {
+		Carga carga = novaCarga();
+		carga.alterarStatus(StatusCarga.COLETADA, null);
+		carga.alterarStatus(StatusCarga.EM_TRANSITO, null);
+		carga.alterarStatus(StatusCarga.ENTREGUE, null);
+
+		assertThatThrownBy(() -> carga.alterarStatus(StatusCarga.EM_TRANSITO, null))
+				.isInstanceOf(RegraNegocioException.class);
+
+		carga.alterarStatus(StatusCarga.OCORRENCIA, "Cliente recusou após descarga");
+		carga.alterarStatus(StatusCarga.DEVOLVIDA, null);
+
+		assertThat(carga.getHistorico()).extracting(HistoricoStatus::getStatusNovo).containsExactly(
+				StatusCarga.AGUARDANDO_COLETA, StatusCarga.COLETADA, StatusCarga.EM_TRANSITO,
+				StatusCarga.ENTREGUE, StatusCarga.OCORRENCIA, StatusCarga.DEVOLVIDA);
+	}
+
+	@Test
+	void devolvidaEhFinal() {
 		assertThat(StatusCarga.DEVOLVIDA.proximosPermitidos()).isEmpty();
+	}
+
+	@Test
+	void coletadaNaoVaiDiretoParaDevolvida() {
+		assertThat(StatusCarga.COLETADA.podeIrPara(StatusCarga.DEVOLVIDA)).isFalse();
 	}
 }

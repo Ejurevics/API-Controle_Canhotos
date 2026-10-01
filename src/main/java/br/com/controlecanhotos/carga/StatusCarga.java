@@ -17,7 +17,8 @@ public enum StatusCarga {
 			case COLETADA -> EnumSet.of(EM_TRANSITO, OCORRENCIA);
 			case EM_TRANSITO -> EnumSet.of(ENTREGUE, OCORRENCIA, DEVOLVIDA);
 			case OCORRENCIA -> EnumSet.of(AGUARDANDO_COLETA, COLETADA, EM_TRANSITO, ENTREGUE, DEVOLVIDA);
-			case ENTREGUE, DEVOLVIDA -> EnumSet.noneOf(StatusCarga.class);
+			case ENTREGUE -> EnumSet.of(OCORRENCIA);
+			case DEVOLVIDA -> EnumSet.noneOf(StatusCarga.class);
 		};
 	}
 
