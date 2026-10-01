@@ -22,7 +22,7 @@ import br.com.controlecanhotos.coleta.Coleta;
 import br.com.controlecanhotos.coleta.SituacaoColeta;
 import br.com.controlecanhotos.historico.HistoricoStatus;
 
-@DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
+@DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(TestcontainersConfiguration.class)
 class MapeamentoEntidadesTest {
