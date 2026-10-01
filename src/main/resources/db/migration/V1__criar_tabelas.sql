@@ -17,7 +17,8 @@ CREATE INDEX ix_coleta_cliente_cnpj ON coleta (cliente_cnpj);
 CREATE TABLE carga (
     id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     coleta_id           BIGINT        NOT NULL,
-    chave_nfe           CHAR(44)      NOT NULL,
+    emitente_cnpj       CHAR(14)      NOT NULL,
+    serie_nota_fiscal   SMALLINT      NOT NULL,
     numero_nota_fiscal  INTEGER       NOT NULL,
     peso_kg             NUMERIC(10,3) NOT NULL,
     cidade_destino      VARCHAR(100)  NOT NULL,
@@ -27,15 +28,17 @@ CREATE TABLE carga (
     atualizado_em       TIMESTAMPTZ   NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_carga_coleta FOREIGN KEY (coleta_id) REFERENCES coleta (id),
-    CONSTRAINT uk_carga_chave_nfe UNIQUE (chave_nfe),
-    CONSTRAINT ck_carga_chave_nfe CHECK (chave_nfe ~ '^[0-9]{44}$'),
-    CONSTRAINT ck_carga_numero_nota_fiscal CHECK (numero_nota_fiscal > 0),
+    CONSTRAINT uk_carga_nota_fiscal UNIQUE (emitente_cnpj, serie_nota_fiscal, numero_nota_fiscal),
+    CONSTRAINT ck_carga_emitente_cnpj CHECK (emitente_cnpj ~ '^[0-9]{14}$'),
+    CONSTRAINT ck_carga_serie_nota_fiscal CHECK (serie_nota_fiscal BETWEEN 0 AND 999),
+    CONSTRAINT ck_carga_numero_nota_fiscal CHECK (numero_nota_fiscal BETWEEN 1 AND 999999999),
     CONSTRAINT ck_carga_peso_kg CHECK (peso_kg > 0),
     CONSTRAINT ck_carga_uf_destino CHECK (uf_destino ~ '^[A-Z]{2}$'),
     CONSTRAINT ck_carga_status CHECK (status IN ('AGUARDANDO_COLETA', 'COLETADA', 'EM_TRANSITO', 'ENTREGUE', 'OCORRENCIA', 'DEVOLVIDA'))
 );
 
 CREATE INDEX ix_carga_coleta_id ON carga (coleta_id);
+CREATE INDEX ix_carga_numero_nota_fiscal ON carga (numero_nota_fiscal);
 CREATE INDEX ix_carga_status ON carga (status);
 
 CREATE TABLE canhoto (

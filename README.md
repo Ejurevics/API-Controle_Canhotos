@@ -25,8 +25,9 @@ erDiagram
     CARGA {
         bigint id PK
         bigint coleta_id FK
-        char chave_nfe UK "chave de acesso da NF-e (44 dígitos)"
-        integer numero_nota_fiscal
+        char emitente_cnpj UK "UK: emitente + série + número"
+        smallint serie_nota_fiscal UK
+        integer numero_nota_fiscal UK
         numeric peso_kg
         varchar cidade_destino
         char uf_destino
@@ -55,7 +56,8 @@ erDiagram
     }
 ```
 
-- Cada carga corresponde a **uma NF-e**, identificada pela chave de acesso.
+- Cada carga corresponde a **uma NF**, identificada por CNPJ do emitente + série + número (combinação única por lei).
+- Se não informados, o CNPJ do emitente assume o do cliente da coleta e a série assume `1`.
 - O canhoto nasce `PENDENTE` junto com a carga. `RECEBIDO` e `DIVERGENTE` exigem data de recebimento; `DIVERGENTE` exige observação.
 - Toda mudança de status da carga gera um registro em `historico_status`.
 - Evolução prevista: agrupar NFs por CT-e (uma carga com várias NFs).
