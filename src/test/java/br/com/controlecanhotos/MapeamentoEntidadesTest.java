@@ -15,6 +15,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
+import br.com.controlecanhotos.canhoto.Canhoto;
 import br.com.controlecanhotos.canhoto.StatusCanhoto;
 import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.StatusCarga;
@@ -54,6 +55,22 @@ class MapeamentoEntidadesTest {
 				.containsExactly(
 						tuple(null, StatusCarga.AGUARDANDO_COLETA),
 						tuple(StatusCarga.AGUARDANDO_COLETA, StatusCarga.COLETADA));
+	}
+
+	@Test
+	void persisteCanhotoDivergente() {
+		Coleta coleta = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 2));
+		Carga carga = coleta.adicionarCarga("11111111000111", (short) 1, 1234,
+				BigDecimal.TEN, "Campinas", "SP");
+		carga.getCanhoto().registrarDivergencia(LocalDate.of(2026, 10, 5), "Assinatura ilegível");
+
+		Long id = em.persistAndFlush(coleta).getId();
+		em.clear();
+
+		Canhoto salvo = em.find(Coleta.class, id).getCargas().getFirst().getCanhoto();
+		assertThat(salvo.getStatus()).isEqualTo(StatusCanhoto.DIVERGENTE);
+		assertThat(salvo.getDataRecebimento()).isEqualTo(LocalDate.of(2026, 10, 5));
+		assertThat(salvo.getObservacao()).isEqualTo("Assinatura ilegível");
 	}
 
 	@Test
