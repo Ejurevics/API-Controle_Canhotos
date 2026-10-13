@@ -85,6 +85,25 @@ class MapeamentoEntidadesTest {
 	}
 
 	@Test
+	void persisteConfirmacaoDeDataFuturaNoHistoricoDoCanhoto() {
+		Coleta coleta = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 2));
+		Carga carga = coleta.adicionarCarga("11111111000111", (short) 1, 1234,
+				BigDecimal.TEN, "Campinas", "SP");
+		carga.alterarStatus(StatusCarga.COLETADA, null);
+		carga.alterarStatus(StatusCarga.EM_TRANSITO, null);
+		carga.alterarStatus(StatusCarga.ENTREGUE, null);
+		carga.getCanhoto().registrarRecebimento(LocalDate.now().plusYears(1), true);
+
+		Long id = em.persistAndFlush(coleta).getId();
+		em.clear();
+
+		Canhoto salvo = em.find(Coleta.class, id).getCargas().getFirst().getCanhoto();
+		assertThat(salvo.getHistorico())
+				.extracting(HistoricoCanhoto::isDataFuturaConfirmada)
+				.containsExactly(false, true);
+	}
+
+	@Test
 	void bloqueiaMesmaNotaFiscalEmColetasDiferentes() {
 		Coleta primeira = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 2));
 		primeira.adicionarCarga("11111111000111", (short) 1, 1234, BigDecimal.TEN, "Campinas", "SP");

@@ -39,6 +39,8 @@ public class HistoricoCanhoto {
 
 	private String observacao;
 
+	private boolean dataFuturaConfirmada;
+
 	@CreationTimestamp
 	@Column(updatable = false)
 	private OffsetDateTime registradoEm;
@@ -47,12 +49,13 @@ public class HistoricoCanhoto {
 	}
 
 	public HistoricoCanhoto(Canhoto canhoto, StatusCanhoto statusAnterior, StatusCanhoto statusNovo,
-			LocalDate dataRecebimento, String observacao) {
+			LocalDate dataRecebimento, String observacao, boolean dataFuturaConfirmada) {
 		this.canhoto = canhoto;
 		this.statusAnterior = statusAnterior;
 		this.statusNovo = statusNovo;
 		this.dataRecebimento = dataRecebimento;
 		this.observacao = observacao;
+		this.dataFuturaConfirmada = dataFuturaConfirmada;
 	}
 
 	public Long getId() {
@@ -77,6 +80,10 @@ public class HistoricoCanhoto {
 
 	public String getObservacao() {
 		return observacao;
+	}
+
+	public boolean isDataFuturaConfirmada() {
+		return dataFuturaConfirmada;
 	}
 
 	public OffsetDateTime getRegistradoEm() {

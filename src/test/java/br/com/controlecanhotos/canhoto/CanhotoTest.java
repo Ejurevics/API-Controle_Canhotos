@@ -226,4 +226,25 @@ class CanhotoTest {
 		assertThat(canhoto.getStatus()).isEqualTo(StatusCanhoto.DIVERGENTE);
 		assertThat(canhoto.getDataRecebimento()).isEqualTo(AMANHA_EM_BRASILIA);
 	}
+
+	@Test
+	void historicoMarcaRegistroFeitoComDataFuturaConfirmada() {
+		Canhoto canhoto = novoCanhoto();
+
+		canhoto.registrarRecebimento(AMANHA_EM_BRASILIA, true, SERVIDOR_UTC_JA_NO_DIA_SEGUINTE);
+
+		assertThat(canhoto.getHistorico())
+				.extracting(HistoricoCanhoto::isDataFuturaConfirmada)
+				.containsExactly(false, true);
+	}
+
+	@Test
+	void historicoNaoMarcaConfirmacaoQuandoDataNaoEraFutura() {
+		Canhoto canhoto = novoCanhoto();
+
+		canhoto.registrarDivergencia(HOJE_EM_BRASILIA, "Assinatura ilegível", true,
+				SERVIDOR_UTC_JA_NO_DIA_SEGUINTE);
+
+		assertThat(canhoto.getHistorico().getLast().isDataFuturaConfirmada()).isFalse();
+	}
 }
