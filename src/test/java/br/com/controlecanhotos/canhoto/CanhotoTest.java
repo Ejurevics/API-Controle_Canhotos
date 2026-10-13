@@ -2,6 +2,7 @@ package br.com.controlecanhotos.canhoto;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.coleta.Coleta;
+import br.com.controlecanhotos.historico.HistoricoCanhoto;
 import br.com.controlecanhotos.shared.exception.ConfirmacaoNecessariaException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 
@@ -115,6 +117,52 @@ class CanhotoTest {
 				.hasMessageContaining("Observação");
 		assertThat(canhoto.getStatus()).isEqualTo(StatusCanhoto.PENDENTE);
 		assertThat(canhoto.getDataRecebimento()).isNull();
+	}
+
+	@Test
+	void nasceComHistoricoInicialPendente() {
+		Canhoto canhoto = novaCarga().getCanhoto();
+
+		assertThat(canhoto.getHistorico())
+				.extracting(HistoricoCanhoto::getStatusAnterior, HistoricoCanhoto::getStatusNovo)
+				.containsExactly(tuple(null, StatusCanhoto.PENDENTE));
+	}
+
+	@Test
+	void cadaRegistroEntraNoHistoricoComSeusDados() {
+		Canhoto canhoto = novoCanhoto();
+
+		canhoto.registrarDivergencia(RECEBIMENTO, "Assinatura ilegível", false);
+		canhoto.registrarRecebimento(RECEBIMENTO.plusDays(2), false);
+
+		assertThat(canhoto.getHistorico())
+				.extracting(HistoricoCanhoto::getStatusAnterior, HistoricoCanhoto::getStatusNovo,
+						HistoricoCanhoto::getDataRecebimento, HistoricoCanhoto::getObservacao)
+				.containsExactly(
+						tuple(null, StatusCanhoto.PENDENTE, null, null),
+						tuple(StatusCanhoto.PENDENTE, StatusCanhoto.DIVERGENTE, RECEBIMENTO, "Assinatura ilegível"),
+						tuple(StatusCanhoto.DIVERGENTE, StatusCanhoto.RECEBIDO, RECEBIMENTO.plusDays(2), null));
+	}
+
+	@Test
+	void recebimentoAposDivergenciaLimpaObservacaoAtual() {
+		Canhoto canhoto = novoCanhoto();
+		canhoto.registrarDivergencia(RECEBIMENTO, "Assinatura ilegível", false);
+
+		canhoto.registrarRecebimento(RECEBIMENTO.plusDays(2), false);
+
+		assertThat(canhoto.getStatus()).isEqualTo(StatusCanhoto.RECEBIDO);
+		assertThat(canhoto.getObservacao()).isNull();
+	}
+
+	@Test
+	void registroRecusadoNaoEntraNoHistorico() {
+		Canhoto canhoto = novoCanhoto();
+
+		assertThatThrownBy(() -> canhoto.registrarDivergencia(RECEBIMENTO, " ", false))
+				.isInstanceOf(RegraNegocioException.class);
+
+		assertThat(canhoto.getHistorico()).hasSize(1);
 	}
 
 	@Test

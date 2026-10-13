@@ -21,6 +21,7 @@ import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.coleta.Coleta;
 import br.com.controlecanhotos.coleta.SituacaoColeta;
+import br.com.controlecanhotos.historico.HistoricoCanhoto;
 import br.com.controlecanhotos.historico.HistoricoStatus;
 
 @DataJpaTest
@@ -74,6 +75,13 @@ class MapeamentoEntidadesTest {
 		assertThat(salvo.getStatus()).isEqualTo(StatusCanhoto.DIVERGENTE);
 		assertThat(salvo.getDataRecebimento()).isEqualTo(LocalDate.of(2026, 10, 5));
 		assertThat(salvo.getObservacao()).isEqualTo("Assinatura ilegível");
+		assertThat(salvo.getHistorico())
+				.extracting(HistoricoCanhoto::getStatusAnterior, HistoricoCanhoto::getStatusNovo,
+						HistoricoCanhoto::getObservacao)
+				.containsExactly(
+						tuple(null, StatusCanhoto.PENDENTE, null),
+						tuple(StatusCanhoto.PENDENTE, StatusCanhoto.DIVERGENTE, "Assinatura ilegível"));
+		assertThat(salvo.getHistorico().getLast().getRegistradoEm()).isNotNull();
 	}
 
 	@Test

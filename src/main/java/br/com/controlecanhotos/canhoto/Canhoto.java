@@ -2,14 +2,19 @@ package br.com.controlecanhotos.canhoto;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.StatusCarga;
+import br.com.controlecanhotos.historico.HistoricoCanhoto;
 import br.com.controlecanhotos.shared.exception.ConfirmacaoNecessariaException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -19,7 +24,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.OrderBy;
 
 @Entity
 public class Canhoto {
@@ -39,6 +46,10 @@ public class Canhoto {
 
 	private String observacao;
 
+	@OneToMany(mappedBy = "canhoto", cascade = CascadeType.ALL)
+	@OrderBy("registradoEm, id")
+	private List<HistoricoCanhoto> historico = new ArrayList<>();
+
 	@CreationTimestamp
 	@Column(updatable = false)
 	private OffsetDateTime criadoEm;
@@ -52,14 +63,14 @@ public class Canhoto {
 	public Canhoto(Carga carga) {
 		this.carga = carga;
 		this.status = StatusCanhoto.PENDENTE;
+		this.historico.add(new HistoricoCanhoto(this, null, status, null, null));
 	}
 
 	public void registrarRecebimento(LocalDate dataRecebimento, boolean dataFuturaConfirmada) {
 		exigirCargaEntregue();
 		exigirDataRecebimento(dataRecebimento);
 		exigirConfirmacaoSeDataFutura(dataRecebimento, dataFuturaConfirmada);
-		this.dataRecebimento = dataRecebimento;
-		this.status = StatusCanhoto.RECEBIDO;
+		registrar(StatusCanhoto.RECEBIDO, dataRecebimento, null);
 	}
 
 	public void registrarDivergencia(LocalDate dataRecebimento, String observacao,
@@ -70,9 +81,14 @@ public class Canhoto {
 			throw new RegraNegocioException("Observação é obrigatória para registrar divergência");
 		}
 		exigirConfirmacaoSeDataFutura(dataRecebimento, dataFuturaConfirmada);
+		registrar(StatusCanhoto.DIVERGENTE, dataRecebimento, observacao);
+	}
+
+	private void registrar(StatusCanhoto novoStatus, LocalDate dataRecebimento, String observacao) {
+		historico.add(new HistoricoCanhoto(this, status, novoStatus, dataRecebimento, observacao));
+		this.status = novoStatus;
 		this.dataRecebimento = dataRecebimento;
 		this.observacao = observacao;
-		this.status = StatusCanhoto.DIVERGENTE;
 	}
 
 	private void exigirCargaEntregue() {
@@ -115,6 +131,10 @@ public class Canhoto {
 
 	public String getObservacao() {
 		return observacao;
+	}
+
+	public List<HistoricoCanhoto> getHistorico() {
+		return Collections.unmodifiableList(historico);
 	}
 
 	public OffsetDateTime getCriadoEm() {
