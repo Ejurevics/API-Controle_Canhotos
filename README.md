@@ -90,6 +90,35 @@ erDiagram
 
 Registrar `OCORRENCIA` exige motivo.
 
+## Endpoints
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `POST` | `/coletas` | Cria uma coleta com suas cargas (`201` + `Location`) |
+| `GET` | `/coletas/{id}` | Busca a coleta com suas cargas |
+
+Exemplo de `POST /coletas` (`emitenteCnpj` e `serieNotaFiscal` são opcionais):
+
+```json
+{
+  "clienteNome": "Cliente A",
+  "clienteCnpj": "11111111000111",
+  "dataProgramada": "2026-10-20",
+  "cargas": [
+    { "numeroNotaFiscal": 1001, "pesoKg": 150.5, "cidadeDestino": "Campinas", "ufDestino": "SP" }
+  ]
+}
+```
+
+Erros seguem o formato `ProblemDetail` (RFC 9457):
+
+| Status | Quando |
+|---|---|
+| `400` | Dados inválidos (campo a campo em `erros`) |
+| `404` | Recurso não encontrado |
+| `409` | Confirmação necessária (`confirmacaoNecessaria: true`) ou violação de integridade |
+| `422` | Regra de negócio violada (ex.: NF já cadastrada) |
+
 ## Stack
 
 Java 21 · Spring Boot 4.1 · Spring Data JPA (Hibernate 7) · PostgreSQL 18 · Flyway · springdoc-openapi · JUnit 5 + Testcontainers
@@ -157,11 +186,11 @@ Perfis Spring:
 
 ```
 src/main/java/br/com/controlecanhotos/
-├── coleta/        Coleta e situação
-├── carga/         Carga, status e regras de transição
+├── coleta/        Coleta, situação, service, controller e DTOs
+├── carga/         Carga, status, regras de transição e DTOs
 ├── canhoto/       Canhoto e status
 ├── historico/     Histórico de status da carga e de registros do canhoto
-└── shared/        Exceções e configurações comuns
+└── shared/        Exceções e tratamento global de erros (ApiExceptionHandler)
 src/main/resources/
 ├── application.yml
 └── db/migration/  Migrations Flyway (V1__, V2__...)
