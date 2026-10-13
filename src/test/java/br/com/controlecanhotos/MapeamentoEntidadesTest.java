@@ -65,7 +65,7 @@ class MapeamentoEntidadesTest {
 		carga.alterarStatus(StatusCarga.COLETADA, null);
 		carga.alterarStatus(StatusCarga.EM_TRANSITO, null);
 		carga.alterarStatus(StatusCarga.ENTREGUE, null);
-		carga.getCanhoto().registrarDivergencia(LocalDate.of(2026, 10, 5), "Assinatura ilegível");
+		carga.getCanhoto().registrarDivergencia(LocalDate.of(2026, 10, 5), "Assinatura ilegível", false);
 
 		Long id = em.persistAndFlush(coleta).getId();
 		em.clear();

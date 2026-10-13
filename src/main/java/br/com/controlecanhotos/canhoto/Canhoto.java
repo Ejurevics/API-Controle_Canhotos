@@ -8,6 +8,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.StatusCarga;
+import br.com.controlecanhotos.shared.exception.ConfirmacaoNecessariaException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -53,19 +54,22 @@ public class Canhoto {
 		this.status = StatusCanhoto.PENDENTE;
 	}
 
-	public void registrarRecebimento(LocalDate dataRecebimento) {
+	public void registrarRecebimento(LocalDate dataRecebimento, boolean dataFuturaConfirmada) {
 		exigirCargaEntregue();
 		exigirDataRecebimento(dataRecebimento);
+		exigirConfirmacaoSeDataFutura(dataRecebimento, dataFuturaConfirmada);
 		this.dataRecebimento = dataRecebimento;
 		this.status = StatusCanhoto.RECEBIDO;
 	}
 
-	public void registrarDivergencia(LocalDate dataRecebimento, String observacao) {
+	public void registrarDivergencia(LocalDate dataRecebimento, String observacao,
+			boolean dataFuturaConfirmada) {
 		exigirCargaEntregue();
 		exigirDataRecebimento(dataRecebimento);
 		if (observacao == null || observacao.isBlank()) {
 			throw new RegraNegocioException("Observação é obrigatória para registrar divergência");
 		}
+		exigirConfirmacaoSeDataFutura(dataRecebimento, dataFuturaConfirmada);
 		this.dataRecebimento = dataRecebimento;
 		this.observacao = observacao;
 		this.status = StatusCanhoto.DIVERGENTE;
@@ -82,6 +86,14 @@ public class Canhoto {
 	private void exigirDataRecebimento(LocalDate dataRecebimento) {
 		if (dataRecebimento == null) {
 			throw new RegraNegocioException("Data de recebimento é obrigatória");
+		}
+	}
+
+	private void exigirConfirmacaoSeDataFutura(LocalDate dataRecebimento, boolean dataFuturaConfirmada) {
+		if (dataRecebimento.isAfter(LocalDate.now()) && !dataFuturaConfirmada) {
+			throw new ConfirmacaoNecessariaException(
+					"Data de recebimento %s é posterior à data atual; confirme para finalizar"
+							.formatted(dataRecebimento));
 		}
 	}
 
