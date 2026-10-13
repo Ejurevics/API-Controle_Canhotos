@@ -90,12 +90,21 @@ erDiagram
 
 Registrar `OCORRENCIA` exige motivo.
 
+### Transições de situação da coleta
+
+| De | Pode ir para |
+|---|---|
+| `PROGRAMADA` | `EM_ANDAMENTO`, `CANCELADA` |
+| `EM_ANDAMENTO` | `CONCLUIDA`, `CANCELADA` |
+| `CONCLUIDA`, `CANCELADA` | — (finais) |
+
 ## Endpoints
 
 | Método | Rota | Descrição |
 |---|---|---|
 | `POST` | `/coletas` | Cria uma coleta com suas cargas (`201` + `Location`) |
 | `GET` | `/coletas/{id}` | Busca a coleta com suas cargas |
+| `PATCH` | `/coletas/{id}/situacao` | Altera a situação da coleta (`{"situacao": "..."}`) |
 | `GET` | `/cargas/{id}` | Busca a carga com o histórico de status |
 | `PATCH` | `/cargas/{id}/status` | Altera o status da carga (`{"status": "...", "motivo": "..."}`); `motivo` é obrigatório para `OCORRENCIA` |
 | `GET` | `/cargas/{id}/canhoto` | Busca o canhoto com o histórico de registros |

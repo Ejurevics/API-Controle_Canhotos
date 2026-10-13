@@ -13,6 +13,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
 import br.com.controlecanhotos.carga.Carga;
+import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -69,6 +70,14 @@ public class Coleta {
 				pesoKg, cidadeDestino, ufDestino);
 		cargas.add(carga);
 		return carga;
+	}
+
+	public void alterarSituacao(SituacaoColeta novaSituacao) {
+		if (!situacao.podeIrPara(novaSituacao)) {
+			throw new RegraNegocioException(
+					"Transição de situação inválida: %s -> %s".formatted(situacao, novaSituacao));
+		}
+		situacao = novaSituacao;
 	}
 
 	public Long getId() {
