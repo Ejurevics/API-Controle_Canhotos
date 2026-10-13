@@ -98,6 +98,16 @@ Registrar `OCORRENCIA` exige motivo.
 | `GET` | `/coletas/{id}` | Busca a coleta com suas cargas |
 | `GET` | `/cargas/{id}` | Busca a carga com o histórico de status |
 | `PATCH` | `/cargas/{id}/status` | Altera o status da carga (`{"status": "...", "motivo": "..."}`); `motivo` é obrigatório para `OCORRENCIA` |
+| `GET` | `/cargas/{id}/canhoto` | Busca o canhoto com o histórico de registros |
+| `POST` | `/cargas/{id}/canhoto/registros` | Registra o canhoto como `RECEBIDO` ou `DIVERGENTE` |
+
+Registro do canhoto (`observacao` obrigatória na `DIVERGENTE`; `dataFuturaConfirmada` opcional, padrão `false`):
+
+```json
+{ "status": "RECEBIDO", "dataRecebimento": "2026-10-14", "dataFuturaConfirmada": false }
+```
+
+Se a data for posterior a hoje (fuso `America/Sao_Paulo`), a primeira tentativa responde `409` com `confirmacaoNecessaria: true`. O cliente avisa o usuário e reenvia com `dataFuturaConfirmada: true`.
 
 Exemplo de `POST /coletas` (`emitenteCnpj` e `serieNotaFiscal` são opcionais):
 
@@ -190,7 +200,7 @@ Perfis Spring:
 src/main/java/br/com/controlecanhotos/
 ├── coleta/        Coleta, situação, service, controller e DTOs
 ├── carga/         Carga, status, regras de transição e DTOs
-├── canhoto/       Canhoto e status
+├── canhoto/       Canhoto, status, service, controller e DTOs
 ├── historico/     Histórico de status da carga e de registros do canhoto
 └── shared/        Exceções e tratamento global de erros (ApiExceptionHandler)
 src/main/resources/
