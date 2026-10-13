@@ -96,6 +96,8 @@ Registrar `OCORRENCIA` exige motivo.
 |---|---|---|
 | `POST` | `/coletas` | Cria uma coleta com suas cargas (`201` + `Location`) |
 | `GET` | `/coletas/{id}` | Busca a coleta com suas cargas |
+| `GET` | `/cargas/{id}` | Busca a carga com o histórico de status |
+| `PATCH` | `/cargas/{id}/status` | Altera o status da carga (`{"status": "...", "motivo": "..."}`); `motivo` é obrigatório para `OCORRENCIA` |
 
 Exemplo de `POST /coletas` (`emitenteCnpj` e `serieNotaFiscal` são opcionais):
 
