@@ -2,7 +2,7 @@
 
 API REST para controle de coletas, cargas e devolução de canhotos (comprovantes de entrega assinados) em uma transportadora, com histórico de status por carga.
 
-> Projeto em construção.
+**Versão atual: `v0.1.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos). Listagens com filtros e paginação, autenticação e agrupamento por CT-e ainda não existem; veja o [Roadmap](#roadmap).
 
 ## Modelo de domínio
 
@@ -221,3 +221,19 @@ src/main/resources/
 Dockerfile         Build multi-stage (JDK para compilar, JRE para rodar)
 docker-compose.yml App + PostgreSQL com healthcheck
 ```
+
+## Fluxo de desenvolvimento
+
+- `main`: versões estáveis, marcadas com tag (`v0.1.0`). Só recebe a `develop` via PR de release, com merge commit.
+- `develop`: integração. Recebe os PRs de feature, com squash.
+- Branches de trabalho nascem da `develop` (`feat/`, `fix/`, `chore/`, `docs/`, `refactor/`) e são apagadas após o merge.
+- Commits seguem Conventional Commits (`feat(coleta): adiciona ...`).
+- Todo PR roda o CI (`./mvnw -B clean verify`). Mudanças que alteram uso, setup ou estrutura atualizam este README no mesmo PR.
+
+## Roadmap
+
+- [ ] Listagens com filtros e paginação (coletas por situação, cliente e período; cargas por status; canhotos pendentes).
+- [ ] Testes de service.
+- [ ] Regra para concluir uma coleta com base no status das cargas.
+- [ ] Autenticação.
+- [ ] Agrupar NFs por CT-e (uma carga com várias NFs).
