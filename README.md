@@ -177,6 +177,8 @@ Com o Docker rodando:
 
 Os testes de integração sobem um PostgreSQL descartável via Testcontainers.
 
+O GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw clean verify` em todo PR e push para `develop` e `main`.
+
 ## Configuração
 
 Todas as variáveis têm valor padrão, então o projeto sobe sem configurar nada. Para mudar, copie `.env.example` para `.env` e preencha. O `docker compose` lê o `.env` automaticamente.
@@ -206,6 +208,7 @@ src/main/java/br/com/controlecanhotos/
 src/main/resources/
 ├── application.yml
 └── db/migration/  Migrations Flyway (V1__, V2__...)
+.github/workflows/ci.yml  CI: build e testes a cada PR
 Dockerfile         Build multi-stage (JDK para compilar, JRE para rodar)
 docker-compose.yml App + PostgreSQL com healthcheck
 ```
