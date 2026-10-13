@@ -5,7 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.Test;
 
@@ -19,6 +22,12 @@ import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 class CanhotoTest {
 
 	private static final LocalDate RECEBIMENTO = LocalDate.of(2026, 10, 5);
+
+	// 01:30 UTC do dia 14 ainda é 22:30 do dia 13 em Brasília
+	private static final Clock SERVIDOR_UTC_JA_NO_DIA_SEGUINTE = Clock.fixed(
+			Instant.parse("2026-10-14T01:30:00Z"), ZoneOffset.UTC);
+	private static final LocalDate HOJE_EM_BRASILIA = LocalDate.of(2026, 10, 13);
+	private static final LocalDate AMANHA_EM_BRASILIA = LocalDate.of(2026, 10, 14);
 
 	private Carga novaCarga() {
 		Coleta coleta = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 2));
@@ -166,20 +175,20 @@ class CanhotoTest {
 	}
 
 	@Test
-	void registrarRecebimentoComDataDeHojeNaoPedeConfirmacao() {
+	void registrarRecebimentoComDataDeHojeEmBrasiliaNaoPedeConfirmacao() {
 		Canhoto canhoto = novoCanhoto();
 
-		canhoto.registrarRecebimento(LocalDate.now(), false);
+		canhoto.registrarRecebimento(HOJE_EM_BRASILIA, false, SERVIDOR_UTC_JA_NO_DIA_SEGUINTE);
 
 		assertThat(canhoto.getStatus()).isEqualTo(StatusCanhoto.RECEBIDO);
 	}
 
 	@Test
-	void registrarRecebimentoComDataFuturaSemConfirmacaoPedeConfirmacaoENaoMudaNada() {
+	void registrarRecebimentoComDataFuturaEmBrasiliaPedeConfirmacaoENaoMudaNada() {
 		Canhoto canhoto = novoCanhoto();
-		LocalDate amanha = LocalDate.now().plusDays(1);
 
-		assertThatThrownBy(() -> canhoto.registrarRecebimento(amanha, false))
+		assertThatThrownBy(() -> canhoto.registrarRecebimento(AMANHA_EM_BRASILIA, false,
+				SERVIDOR_UTC_JA_NO_DIA_SEGUINTE))
 				.isInstanceOf(ConfirmacaoNecessariaException.class)
 				.hasMessageContaining("posterior à data atual");
 		assertThat(canhoto.getStatus()).isEqualTo(StatusCanhoto.PENDENTE);
@@ -189,20 +198,19 @@ class CanhotoTest {
 	@Test
 	void registrarRecebimentoComDataFuturaConfirmadaMarcaRecebido() {
 		Canhoto canhoto = novoCanhoto();
-		LocalDate amanha = LocalDate.now().plusDays(1);
 
-		canhoto.registrarRecebimento(amanha, true);
+		canhoto.registrarRecebimento(AMANHA_EM_BRASILIA, true, SERVIDOR_UTC_JA_NO_DIA_SEGUINTE);
 
 		assertThat(canhoto.getStatus()).isEqualTo(StatusCanhoto.RECEBIDO);
-		assertThat(canhoto.getDataRecebimento()).isEqualTo(amanha);
+		assertThat(canhoto.getDataRecebimento()).isEqualTo(AMANHA_EM_BRASILIA);
 	}
 
 	@Test
-	void registrarDivergenciaComDataFuturaSemConfirmacaoPedeConfirmacaoENaoMudaNada() {
+	void registrarDivergenciaComDataFuturaEmBrasiliaPedeConfirmacaoENaoMudaNada() {
 		Canhoto canhoto = novoCanhoto();
-		LocalDate amanha = LocalDate.now().plusDays(1);
 
-		assertThatThrownBy(() -> canhoto.registrarDivergencia(amanha, "Assinatura ilegível", false))
+		assertThatThrownBy(() -> canhoto.registrarDivergencia(AMANHA_EM_BRASILIA, "Assinatura ilegível",
+				false, SERVIDOR_UTC_JA_NO_DIA_SEGUINTE))
 				.isInstanceOf(ConfirmacaoNecessariaException.class);
 		assertThat(canhoto.getStatus()).isEqualTo(StatusCanhoto.PENDENTE);
 		assertThat(canhoto.getObservacao()).isNull();
@@ -211,11 +219,11 @@ class CanhotoTest {
 	@Test
 	void registrarDivergenciaComDataFuturaConfirmadaMarcaDivergente() {
 		Canhoto canhoto = novoCanhoto();
-		LocalDate amanha = LocalDate.now().plusDays(1);
 
-		canhoto.registrarDivergencia(amanha, "Assinatura ilegível", true);
+		canhoto.registrarDivergencia(AMANHA_EM_BRASILIA, "Assinatura ilegível", true,
+				SERVIDOR_UTC_JA_NO_DIA_SEGUINTE);
 
 		assertThat(canhoto.getStatus()).isEqualTo(StatusCanhoto.DIVERGENTE);
-		assertThat(canhoto.getDataRecebimento()).isEqualTo(amanha);
+		assertThat(canhoto.getDataRecebimento()).isEqualTo(AMANHA_EM_BRASILIA);
 	}
 }

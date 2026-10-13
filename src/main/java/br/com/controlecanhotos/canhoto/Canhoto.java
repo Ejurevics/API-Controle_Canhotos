@@ -1,7 +1,9 @@
 package br.com.controlecanhotos.canhoto;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +32,8 @@ import jakarta.persistence.OrderBy;
 
 @Entity
 public class Canhoto {
+
+	private static final ZoneId FUSO_REFERENCIA = ZoneId.of("America/Sao_Paulo");
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -67,20 +71,29 @@ public class Canhoto {
 	}
 
 	public void registrarRecebimento(LocalDate dataRecebimento, boolean dataFuturaConfirmada) {
+		registrarRecebimento(dataRecebimento, dataFuturaConfirmada, Clock.systemUTC());
+	}
+
+	public void registrarRecebimento(LocalDate dataRecebimento, boolean dataFuturaConfirmada, Clock relogio) {
 		exigirCargaEntregue();
 		exigirDataRecebimento(dataRecebimento);
-		exigirConfirmacaoSeDataFutura(dataRecebimento, dataFuturaConfirmada);
+		exigirConfirmacaoSeDataFutura(dataRecebimento, dataFuturaConfirmada, relogio);
 		registrar(StatusCanhoto.RECEBIDO, dataRecebimento, null);
 	}
 
 	public void registrarDivergencia(LocalDate dataRecebimento, String observacao,
 			boolean dataFuturaConfirmada) {
+		registrarDivergencia(dataRecebimento, observacao, dataFuturaConfirmada, Clock.systemUTC());
+	}
+
+	public void registrarDivergencia(LocalDate dataRecebimento, String observacao,
+			boolean dataFuturaConfirmada, Clock relogio) {
 		exigirCargaEntregue();
 		exigirDataRecebimento(dataRecebimento);
 		if (observacao == null || observacao.isBlank()) {
 			throw new RegraNegocioException("Observação é obrigatória para registrar divergência");
 		}
-		exigirConfirmacaoSeDataFutura(dataRecebimento, dataFuturaConfirmada);
+		exigirConfirmacaoSeDataFutura(dataRecebimento, dataFuturaConfirmada, relogio);
 		registrar(StatusCanhoto.DIVERGENTE, dataRecebimento, observacao);
 	}
 
@@ -105,8 +118,10 @@ public class Canhoto {
 		}
 	}
 
-	private void exigirConfirmacaoSeDataFutura(LocalDate dataRecebimento, boolean dataFuturaConfirmada) {
-		if (dataRecebimento.isAfter(LocalDate.now()) && !dataFuturaConfirmada) {
+	private void exigirConfirmacaoSeDataFutura(LocalDate dataRecebimento, boolean dataFuturaConfirmada,
+			Clock relogio) {
+		LocalDate hoje = LocalDate.now(relogio.withZone(FUSO_REFERENCIA));
+		if (dataRecebimento.isAfter(hoje) && !dataFuturaConfirmada) {
 			throw new ConfirmacaoNecessariaException(
 					"Data de recebimento %s é posterior à data atual; confirme para finalizar"
 							.formatted(dataRecebimento));
