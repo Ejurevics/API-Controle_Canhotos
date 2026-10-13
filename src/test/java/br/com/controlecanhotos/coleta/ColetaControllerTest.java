@@ -1,6 +1,7 @@
 package br.com.controlecanhotos.coleta;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -108,5 +109,67 @@ class ColetaControllerTest {
 				.andExpect(jsonPath("$.erros.clienteCnpj").exists())
 				.andExpect(jsonPath("$.erros.dataProgramada").exists())
 				.andExpect(jsonPath("$.erros.cargas").exists());
+	}
+
+	private String criarColeta(int numeroNf) throws Exception {
+		return mvc.perform(post("/coletas").contentType(MediaType.APPLICATION_JSON)
+				.content(coleta(carga(numeroNf, ""))))
+				.andReturn().getResponse().getHeader("Location");
+	}
+
+	private static String situacao(String situacao) {
+		return "{\"situacao\": \"%s\"}".formatted(situacao);
+	}
+
+	@Test
+	void alteraSituacaoSeguindoOFluxo() throws Exception {
+		String location = criarColeta(1101);
+
+		mvc.perform(patch(location + "/situacao").contentType(MediaType.APPLICATION_JSON)
+				.content(situacao("EM_ANDAMENTO")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.situacao").value("EM_ANDAMENTO"));
+
+		mvc.perform(patch(location + "/situacao").contentType(MediaType.APPLICATION_JSON)
+				.content(situacao("CONCLUIDA")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.situacao").value("CONCLUIDA"));
+
+		mvc.perform(get(location)).andExpect(jsonPath("$.situacao").value("CONCLUIDA"));
+	}
+
+	@Test
+	void rejeitaTransicaoDeSituacaoInvalida() throws Exception {
+		String location = criarColeta(1102);
+
+		mvc.perform(patch(location + "/situacao").contentType(MediaType.APPLICATION_JSON)
+				.content(situacao("CONCLUIDA")))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.detail").value(
+						org.hamcrest.Matchers.containsString("Transição de situação inválida")));
+	}
+
+	@Test
+	void situacaoFinalNaoMuda() throws Exception {
+		String location = criarColeta(1103);
+		mvc.perform(patch(location + "/situacao").contentType(MediaType.APPLICATION_JSON)
+				.content(situacao("CANCELADA"))).andExpect(status().isOk());
+
+		mvc.perform(patch(location + "/situacao").contentType(MediaType.APPLICATION_JSON)
+				.content(situacao("PROGRAMADA")))
+				.andExpect(status().isUnprocessableContent());
+	}
+
+	@Test
+	void validaSituacaoNaAlteracao() throws Exception {
+		String location = criarColeta(1104);
+
+		mvc.perform(patch(location + "/situacao").contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.erros.situacao").exists());
+
+		mvc.perform(patch("/coletas/999999/situacao").contentType(MediaType.APPLICATION_JSON)
+				.content(situacao("CANCELADA")))
+				.andExpect(status().isNotFound());
 	}
 }

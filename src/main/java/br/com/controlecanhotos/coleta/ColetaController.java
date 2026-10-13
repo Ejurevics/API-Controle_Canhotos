@@ -4,12 +4,14 @@ import java.net.URI;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.com.controlecanhotos.coleta.dto.AlterarSituacaoRequest;
 import br.com.controlecanhotos.coleta.dto.ColetaResponse;
 import br.com.controlecanhotos.coleta.dto.CriarColetaRequest;
 import jakarta.validation.Valid;
@@ -33,5 +35,10 @@ public class ColetaController {
 	@GetMapping("/{id}")
 	ColetaResponse buscar(@PathVariable Long id) {
 		return service.buscar(id);
+	}
+
+	@PatchMapping("/{id}/situacao")
+	ColetaResponse alterarSituacao(@PathVariable Long id, @RequestBody @Valid AlterarSituacaoRequest request) {
+		return service.alterarSituacao(id, request.situacao());
 	}
 }

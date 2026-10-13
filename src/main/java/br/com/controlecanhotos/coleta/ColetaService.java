@@ -56,4 +56,12 @@ public class ColetaService {
 				.map(ColetaResponse::de)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Coleta não encontrada: " + id));
 	}
+
+	@Transactional
+	public ColetaResponse alterarSituacao(Long id, SituacaoColeta novaSituacao) {
+		Coleta coleta = coletaRepository.findById(id)
+				.orElseThrow(() -> new RecursoNaoEncontradoException("Coleta não encontrada: " + id));
+		coleta.alterarSituacao(novaSituacao);
+		return ColetaResponse.de(coleta);
+	}
 }
