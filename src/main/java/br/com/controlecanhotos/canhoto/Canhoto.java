@@ -7,6 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import br.com.controlecanhotos.carga.Carga;
+import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -53,12 +54,14 @@ public class Canhoto {
 	}
 
 	public void registrarRecebimento(LocalDate dataRecebimento) {
+		exigirCargaEntregue();
 		exigirDataRecebimento(dataRecebimento);
 		this.dataRecebimento = dataRecebimento;
 		this.status = StatusCanhoto.RECEBIDO;
 	}
 
 	public void registrarDivergencia(LocalDate dataRecebimento, String observacao) {
+		exigirCargaEntregue();
 		exigirDataRecebimento(dataRecebimento);
 		if (observacao == null || observacao.isBlank()) {
 			throw new RegraNegocioException("Observação é obrigatória para registrar divergência");
@@ -66,6 +69,14 @@ public class Canhoto {
 		this.dataRecebimento = dataRecebimento;
 		this.observacao = observacao;
 		this.status = StatusCanhoto.DIVERGENTE;
+	}
+
+	private void exigirCargaEntregue() {
+		if (carga.getStatus() != StatusCarga.ENTREGUE) {
+			throw new RegraNegocioException(
+					"Canhoto só pode ser registrado com a carga ENTREGUE (status atual: %s)"
+							.formatted(carga.getStatus()));
+		}
 	}
 
 	private void exigirDataRecebimento(LocalDate dataRecebimento) {

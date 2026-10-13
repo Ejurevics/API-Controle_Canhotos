@@ -62,6 +62,9 @@ class MapeamentoEntidadesTest {
 		Coleta coleta = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 2));
 		Carga carga = coleta.adicionarCarga("11111111000111", (short) 1, 1234,
 				BigDecimal.TEN, "Campinas", "SP");
+		carga.alterarStatus(StatusCarga.COLETADA, null);
+		carga.alterarStatus(StatusCarga.EM_TRANSITO, null);
+		carga.alterarStatus(StatusCarga.ENTREGUE, null);
 		carga.getCanhoto().registrarDivergencia(LocalDate.of(2026, 10, 5), "Assinatura ilegível");
 
 		Long id = em.persistAndFlush(coleta).getId();

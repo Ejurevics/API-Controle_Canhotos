@@ -59,6 +59,7 @@ erDiagram
 - Cada carga corresponde a **uma NF**, identificada por CNPJ do emitente + série + número (combinação única por lei).
 - Se não informados, o CNPJ do emitente assume o do cliente da coleta e a série assume `1`.
 - O canhoto nasce `PENDENTE` junto com a carga. `RECEBIDO` e `DIVERGENTE` exigem data de recebimento; `DIVERGENTE` exige observação.
+- O canhoto só pode ser registrado (`RECEBIDO` ou `DIVERGENTE`) com a carga `ENTREGUE`.
 - Toda mudança de status da carga gera um registro em `historico_status`.
 - Evolução prevista: agrupar NFs por CT-e (uma carga com várias NFs).
 
