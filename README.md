@@ -11,6 +11,7 @@ erDiagram
     COLETA ||--|{ CARGA : agrupa
     CARGA ||--|| CANHOTO : possui
     CARGA ||--|{ HISTORICO_STATUS : registra
+    CANHOTO ||--|{ HISTORICO_CANHOTO : registra
 
     COLETA {
         bigint id PK
@@ -54,11 +55,25 @@ erDiagram
         timestamptz alterado_em
         varchar motivo
     }
+
+    HISTORICO_CANHOTO {
+        bigint id PK
+        bigint canhoto_id FK
+        varchar status_anterior
+        varchar status_novo
+        date data_recebimento
+        varchar observacao
+        boolean data_futura_confirmada
+        timestamptz registrado_em
+    }
 ```
 
 - Cada carga corresponde a **uma NF**, identificada por CNPJ do emitente + série + número (combinação única por lei).
 - Se não informados, o CNPJ do emitente assume o do cliente da coleta e a série assume `1`.
 - O canhoto nasce `PENDENTE` junto com a carga. `RECEBIDO` e `DIVERGENTE` exigem data de recebimento; `DIVERGENTE` exige observação.
+- O canhoto só pode ser registrado (`RECEBIDO` ou `DIVERGENTE`) com a carga `ENTREGUE`.
+- Data de recebimento posterior à data atual (no fuso `America/Sao_Paulo`, independente do fuso do servidor) gera aviso e só é aceita com confirmação explícita, que fica marcada no histórico do canhoto.
+- O canhoto pode ser registrado mais de uma vez (ex.: `DIVERGENTE` e depois `RECEBIDO`). Cada registro fica em `historico_canhoto` com status, data e observação; o canhoto guarda só o estado atual.
 - Toda mudança de status da carga gera um registro em `historico_status`.
 - Evolução prevista: agrupar NFs por CT-e (uma carga com várias NFs).
 
@@ -145,7 +160,7 @@ src/main/java/br/com/controlecanhotos/
 ├── coleta/        Coleta e situação
 ├── carga/         Carga, status e regras de transição
 ├── canhoto/       Canhoto e status
-├── historico/     Histórico de status da carga
+├── historico/     Histórico de status da carga e de registros do canhoto
 └── shared/        Exceções e configurações comuns
 src/main/resources/
 ├── application.yml
