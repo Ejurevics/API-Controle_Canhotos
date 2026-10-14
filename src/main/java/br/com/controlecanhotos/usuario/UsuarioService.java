@@ -58,20 +58,13 @@ public class UsuarioService {
 				.map(UsuarioResponse::de));
 	}
 
-	/**
-	 * Ninguém desativa a si mesmo, e o último ADMIN ativo não pode ser desativado: sem ele, ninguém mais
-	 * gerencia usuários (o ADMIN inicial só é criado quando não existe ADMIN nenhum, nem inativo).
-	 */
+	/** Ninguém desativa a si mesmo, e o último ADMIN ativo não pode ser desativado. */
 	@Transactional
 	public UsuarioResponse alterarAtivo(Long id, boolean ativo, String loginDoSolicitante) {
 		Usuario usuario = encontrar(id);
 		if (!ativo && usuario.isAtivo()) {
-			if (usuario.getLogin().equals(Usuario.normalizarLogin(loginDoSolicitante))) {
-				throw new RegraNegocioException("Não é possível desativar o próprio usuário");
-			}
-			if (usuario.getPerfil() == Perfil.ADMIN && usuarioRepository.countByPerfilAndAtivoTrue(Perfil.ADMIN) <= 1) {
-				throw new RegraNegocioException("Não é possível desativar o último ADMIN ativo");
-			}
+			exigirOutroUsuario(usuario, loginDoSolicitante, "desativar o próprio usuário");
+			exigirOutroAdminAtivo(usuario, "desativar");
 		}
 		if (ativo) {
 			usuario.ativar();
@@ -79,6 +72,39 @@ public class UsuarioService {
 			usuario.desativar();
 		}
 		return UsuarioResponse.de(usuario);
+	}
+
+	/**
+	 * Mesmas travas da desativação: ninguém altera o próprio perfil, e o último ADMIN ativo não vira OPERADOR.
+	 * Trocar o perfil derruba os tokens do usuário, que levam o perfil antigo (ADR 0004).
+	 */
+	@Transactional
+	public UsuarioResponse alterarPerfil(Long id, Perfil perfil, String loginDoSolicitante) {
+		Usuario usuario = encontrar(id);
+		if (usuario.getPerfil() != perfil) {
+			exigirOutroUsuario(usuario, loginDoSolicitante, "alterar o próprio perfil");
+			if (usuario.isAtivo()) {
+				exigirOutroAdminAtivo(usuario, "rebaixar");
+			}
+			usuario.alterarPerfil(perfil);
+		}
+		return UsuarioResponse.de(usuario);
+	}
+
+	private static void exigirOutroUsuario(Usuario usuario, String loginDoSolicitante, String acao) {
+		if (usuario.getLogin().equals(Usuario.normalizarLogin(loginDoSolicitante))) {
+			throw new RegraNegocioException("Não é possível " + acao);
+		}
+	}
+
+	/**
+	 * Sem ADMIN ativo, ninguém mais gerencia usuários (o ADMIN inicial só é criado quando não existe ADMIN
+	 * nenhum, nem inativo).
+	 */
+	private void exigirOutroAdminAtivo(Usuario usuario, String acao) {
+		if (usuario.getPerfil() == Perfil.ADMIN && usuarioRepository.countByPerfilAndAtivoTrue(Perfil.ADMIN) <= 1) {
+			throw new RegraNegocioException("Não é possível " + acao + " o último ADMIN ativo");
+		}
 	}
 
 	/** ADMIN define uma nova senha para outro usuário (por exemplo, quando ele a esqueceu). */

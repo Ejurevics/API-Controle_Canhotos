@@ -133,6 +133,7 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 | `GET` | `/usuarios` | Lista usuários com filtros e paginação. Só ADMIN |
 | `GET` | `/usuarios/{id}` | Busca um usuário. Só ADMIN |
 | `PATCH` | `/usuarios/{id}/ativo` | Desativa ou reativa um usuário (`{"ativo": false}`). Só ADMIN |
+| `PATCH` | `/usuarios/{id}/perfil` | Altera o perfil do usuário (`{"perfil": "ADMIN"}`). Só ADMIN |
 | `PATCH` | `/usuarios/{id}/senha` | Define uma nova senha para o usuário (`{"novaSenha": "..."}`, `204`). Só ADMIN |
 
 ### Autenticação
@@ -170,6 +171,7 @@ curl -s -X POST http://localhost:8080/usuarios \
 - Login: de 3 a 50 caracteres (letras, números, `.`, `-` e `_`), guardado em minúsculas e sem espaços nas pontas; repetido responde `422`.
 - Senha: de 8 a 72 caracteres e no máximo 72 bytes em UTF-8 (limite do BCrypt). A resposta nunca traz a senha nem o hash.
 - Usuários não são apagados, só desativados: usuário inativo não entra. Ninguém desativa o próprio usuário, e o último ADMIN ativo não pode ser desativado (`422`).
+- Perfil: ninguém altera o próprio, e o último ADMIN ativo não pode virar OPERADOR (`422`). A troca derruba os tokens do usuário, que entra de novo já com o perfil novo; pedir o perfil que ele já tem não muda nada.
 - Trocar a senha (`PATCH /auth/senha`) exige a senha atual; errada responde `422`.
 - Desativar o usuário ou trocar a senha (pelo próprio usuário ou pelo ADMIN) derruba na hora todos os tokens já emitidos para ele, inclusive o usado na troca: é preciso entrar de novo. Reativar não devolve os tokens antigos ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
 
@@ -350,4 +352,5 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Histórico da carga e do canhoto registra o usuário que fez cada mudança.
 - [x] Limite de tentativas de login por login e por IP ([ADR 0003](docs/adr/0003-limite-tentativas-login.md)).
 - [x] Revogar os tokens de quem é desativado ou troca a senha ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
+- [x] Alterar o perfil de um usuário.
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).

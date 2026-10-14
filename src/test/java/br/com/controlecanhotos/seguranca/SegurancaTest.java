@@ -367,6 +367,34 @@ class SegurancaTest {
 				.andExpect(status().isUnauthorized());
 	}
 
+	@Test
+	void promovidoAAdminEntraDeNovoEPassaAGerenciarUsuarios() throws Exception {
+		criarUsuario("sera-promovido", Perfil.OPERADOR, true);
+		String tokenDeOperador = entrar("sera-promovido", "senha-forte-1");
+		long id = usuarios.findByLogin("sera-promovido").orElseThrow().getId();
+
+		mvc.perform(patch("/usuarios/{id}/perfil", id).header(HttpHeaders.AUTHORIZATION,
+				bearer(entrar("admin", "admin12345")))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"perfil\": \"ADMIN\"}"))
+				.andExpect(status().isOk());
+
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(tokenDeOperador)))
+				.andExpect(status().isUnauthorized());
+		mvc.perform(get("/usuarios").header(HttpHeaders.AUTHORIZATION, bearer(entrar("sera-promovido",
+				"senha-forte-1")))).andExpect(status().isOk());
+	}
+
+	@Test
+	void adminNaoAlteraOProprioPerfil() throws Exception {
+		String token = entrar("admin", "admin12345");
+		long id = usuarios.findByLogin("admin").orElseThrow().getId();
+
+		mvc.perform(patch("/usuarios/{id}/perfil", id).header(HttpHeaders.AUTHORIZATION, bearer(token))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"perfil\": \"OPERADOR\"}"))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.detail").value("Não é possível alterar o próprio perfil"));
+	}
+
 	private void alterarAtivo(String tokenAdmin, long id, boolean ativo) throws Exception {
 		mvc.perform(patch("/usuarios/{id}/ativo", id).header(HttpHeaders.AUTHORIZATION, bearer(tokenAdmin))
 				.contentType(MediaType.APPLICATION_JSON).content("{\"ativo\": %s}".formatted(ativo)))

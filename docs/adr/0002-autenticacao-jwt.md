@@ -49,4 +49,4 @@ Rotas públicas: `POST /auth/login`, `/actuator/health` e a documentação (`/sw
 - Usuários não são apagados, só desativados, para não perder a referência de quem existiu.
 - Ninguém desativa o próprio usuário, e o último ADMIN ativo não pode ser desativado: sem ele ninguém mais gerencia usuários, e o ADMIN inicial só é recriado quando não existe ADMIN nenhum.
 - Senha de 8 a 72 caracteres e no máximo 72 bytes em UTF-8, o limite do BCrypt.
-- Trocar o perfil de um usuário fica de fora por enquanto (não estava no escopo).
+- Trocar o perfil de um usuário fica de fora por enquanto (não estava no escopo). Adicionado depois em `PATCH /usuarios/{id}/perfil`, com as mesmas travas da desativação (ninguém altera o próprio perfil; o último ADMIN ativo não vira OPERADOR) e revogando os tokens do usuário ([ADR 0004](0004-revogar-tokens-por-versao-de-credencial.md)).

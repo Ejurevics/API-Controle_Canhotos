@@ -12,7 +12,7 @@ O [ADR 0002](0002-autenticacao-jwt.md) aceitou, como risco, que o token não fos
 1. **Versão da credencial no usuário** (`usuario.versao_credencial`, migration V6, começa em 0).
 2. **O token leva a versão** no claim `ver`.
 3. **A cada requisição autenticada**, depois das validações de assinatura, data e emissor, a API consulta o usuário pelo login (`sub`) e só aceita o token se o usuário existe, está ativo e a versão do token é a atual. Senão, responde `401`.
-4. **Incrementam a versão:** desativar o usuário e trocar a senha (pelo próprio usuário em `PATCH /auth/senha` ou pelo ADMIN em `PATCH /usuarios/{id}/senha`). Reativar não incrementa nem devolve os tokens antigos: o usuário entra de novo.
+4. **Incrementam a versão:** desativar o usuário, trocar a senha (pelo próprio usuário em `PATCH /auth/senha` ou pelo ADMIN em `PATCH /usuarios/{id}/senha`) e trocar o perfil (`PATCH /usuarios/{id}/perfil`), já que o token leva o perfil. Reativar não incrementa nem devolve os tokens antigos: o usuário entra de novo.
 5. **Trocar a própria senha derruba também o token usado na troca**, e o usuário entra de novo com a senha nova. A resposta continua `204`, sem token novo.
 6. **Token sem `ver`** (emitido antes desta mudança) é recusado: todos entram de novo uma vez, depois da atualização.
 
