@@ -2,6 +2,7 @@ package br.com.controlecanhotos.seguranca;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -28,6 +29,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
@@ -115,6 +117,7 @@ class SegurancaTest {
 		Jwt jwt = jwtDecoder.decode(token);
 		assertThat(jwt.getSubject()).isEqualTo("admin");
 		assertThat(jwt.getClaimAsString("perfil")).isEqualTo("ADMIN");
+		assertThat(jwt.<Number>getClaim(SegurancaConfig.CLAIM_VERSAO_CREDENCIAL)).isNotNull();
 		assertThat(jwt.getClaimAsString("iss")).isEqualTo(SegurancaConfig.EMISSOR);
 		assertThat(jwt.getExpiresAt()).isCloseTo(Instant.now().plus(1, ChronoUnit.HOURS),
 				org.assertj.core.api.Assertions.within(1, ChronoUnit.MINUTES));
@@ -170,6 +173,67 @@ class SegurancaTest {
 				.andExpect(jsonPath("$.detail").value(containsString("não tem permissão")));
 	}
 
+	/**
+	 * Tentativa de login vinda de {@code ip}. Os testes do limite usam IPs próprios, porque o contador fica no
+	 * contexto Spring compartilhado entre as classes de teste.
+	 */
+	private ResultActions tentar(String login, String senha, String ip) throws Exception {
+		return mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content(credenciais(login, senha))
+				.with(requisicao -> {
+					requisicao.setRemoteAddr(ip);
+					return requisicao;
+				}));
+	}
+
+	@Test
+	void bloqueiaOLoginDepoisDeCincoFalhasMesmoComASenhaCerta() throws Exception {
+		criarUsuario("alvo-forca-bruta", Perfil.OPERADOR, true);
+		for (int i = 0; i < 5; i++) {
+			tentar("alvo-forca-bruta", "senha-errada", "10.1.0.1").andExpect(status().isUnauthorized());
+		}
+
+		tentar("alvo-forca-bruta", "senha-forte-1", "10.1.0.2")
+				.andExpect(status().isTooManyRequests())
+				// Até 900 s (15 min), descontado o tempo das tentativas anteriores.
+				.andExpect(header().string(HttpHeaders.RETRY_AFTER, matchesPattern("8[6-9]\\d|900")))
+				.andExpect(jsonPath("$.status").value(429))
+				.andExpect(jsonPath("$.detail").value(containsString("Muitas tentativas de login")));
+	}
+
+	@Test
+	void loginInexistenteTambemEhBloqueado() throws Exception {
+		for (int i = 0; i < 5; i++) {
+			tentar("ninguem-aqui", "qualquer", "10.2.0.1").andExpect(status().isUnauthorized());
+		}
+
+		tentar("ninguem-aqui", "qualquer", "10.2.0.1").andExpect(status().isTooManyRequests());
+	}
+
+	@Test
+	void bloqueiaOIpQueErraEmVariosLogins() throws Exception {
+		for (int i = 0; i < 20; i++) {
+			tentar("spray-" + i, "senha-comum", "10.3.0.1").andExpect(status().isUnauthorized());
+		}
+
+		tentar("admin", "admin12345", "10.3.0.1").andExpect(status().isTooManyRequests());
+		tentar("admin", "admin12345", "10.3.0.2").andExpect(status().isOk());
+	}
+
+	@Test
+	void loginCertoZeraAsFalhasDoLogin() throws Exception {
+		criarUsuario("erra-e-acerta", Perfil.OPERADOR, true);
+		for (int i = 0; i < 4; i++) {
+			tentar("erra-e-acerta", "senha-errada", "10.4.0.1").andExpect(status().isUnauthorized());
+		}
+		tentar("erra-e-acerta", "senha-forte-1", "10.4.0.1").andExpect(status().isOk());
+
+		for (int i = 0; i < 4; i++) {
+			tentar("erra-e-acerta", "senha-errada", "10.4.0.1").andExpect(status().isUnauthorized());
+		}
+		tentar("erra-e-acerta", "senha-forte-1", "10.4.0.1").andExpect(status().isOk());
+	}
+
 	@Test
 	void operadorNaoGerenciaUsuarios() throws Exception {
 		criarUsuario("operador-sem-gestao", Perfil.OPERADOR, true);
@@ -197,6 +261,8 @@ class SegurancaTest {
 				.content("{\"senhaAtual\": \"senha-forte-1\", \"novaSenha\": \"senha-nova-12\"}"))
 				.andExpect(status().isNoContent());
 
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(token)))
+				.andExpect(status().isUnauthorized());
 		entrar("troca-senha", "senha-nova-12");
 	}
 
@@ -232,16 +298,106 @@ class SegurancaTest {
 		}
 	}
 
-	/** Token assinado com a chave certa, mas com emissor e data de emissão escolhidos (vale 1h). */
+	/**
+	 * Token do admin assinado com a chave certa e a versão de credencial atual, mas com emissor e data de
+	 * emissão escolhidos (vale 1h).
+	 */
 	private String token(String emissor, Instant emitidoEm) {
-		JwtClaimsSet claims = JwtClaimsSet.builder()
+		int versao = usuarios.findByLogin("admin").orElseThrow().getVersaoCredencial();
+		return token(emissor, emitidoEm, versao);
+	}
+
+	private String token(String emissor, Instant emitidoEm, Integer versao) {
+		JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
 				.issuer(emissor)
 				.subject("admin")
 				.issuedAt(emitidoEm)
 				.expiresAt(emitidoEm.plus(1, ChronoUnit.HOURS))
-				.claim("perfil", "ADMIN")
-				.build();
-		return jwtEncoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
-				.getTokenValue();
+				.claim("perfil", "ADMIN");
+		if (versao != null) {
+			claims.claim(SegurancaConfig.CLAIM_VERSAO_CREDENCIAL, versao);
+		}
+		return jwtEncoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(),
+				claims.build())).getTokenValue();
+	}
+
+	@Test
+	void tokenMontadoComAVersaoAtualEhAceito() throws Exception {
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(token(SegurancaConfig.EMISSOR,
+				Instant.now())))).andExpect(status().isOk());
+	}
+
+	@Test
+	void tokenSemVersaoDeCredencialResponde401() throws Exception {
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(token(SegurancaConfig.EMISSOR,
+				Instant.now(), null)))).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void desativarDerrubaOsTokensEReativarNaoOsDevolve() throws Exception {
+		criarUsuario("sera-desativado", Perfil.OPERADOR, true);
+		String tokenAntigo = entrar("sera-desativado", "senha-forte-1");
+		String admin = entrar("admin", "admin12345");
+		long id = usuarios.findByLogin("sera-desativado").orElseThrow().getId();
+
+		alterarAtivo(admin, id, false);
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(tokenAntigo)))
+				.andExpect(status().isUnauthorized());
+
+		alterarAtivo(admin, id, true);
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(tokenAntigo)))
+				.andExpect(status().isUnauthorized());
+		String tokenNovo = entrar("sera-desativado", "senha-forte-1");
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(tokenNovo)))
+				.andExpect(status().isOk());
+	}
+
+	@Test
+	void senhaRedefinidaPeloAdminDerrubaOsTokensDoUsuario() throws Exception {
+		criarUsuario("senha-redefinida", Perfil.OPERADOR, true);
+		String tokenAntigo = entrar("senha-redefinida", "senha-forte-1");
+		long id = usuarios.findByLogin("senha-redefinida").orElseThrow().getId();
+
+		mvc.perform(patch("/usuarios/{id}/senha", id).header(HttpHeaders.AUTHORIZATION,
+				bearer(entrar("admin", "admin12345")))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"novaSenha\": \"senha-nova-12\"}"))
+				.andExpect(status().isNoContent());
+
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(tokenAntigo)))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void promovidoAAdminEntraDeNovoEPassaAGerenciarUsuarios() throws Exception {
+		criarUsuario("sera-promovido", Perfil.OPERADOR, true);
+		String tokenDeOperador = entrar("sera-promovido", "senha-forte-1");
+		long id = usuarios.findByLogin("sera-promovido").orElseThrow().getId();
+
+		mvc.perform(patch("/usuarios/{id}/perfil", id).header(HttpHeaders.AUTHORIZATION,
+				bearer(entrar("admin", "admin12345")))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"perfil\": \"ADMIN\"}"))
+				.andExpect(status().isOk());
+
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(tokenDeOperador)))
+				.andExpect(status().isUnauthorized());
+		mvc.perform(get("/usuarios").header(HttpHeaders.AUTHORIZATION, bearer(entrar("sera-promovido",
+				"senha-forte-1")))).andExpect(status().isOk());
+	}
+
+	@Test
+	void adminNaoAlteraOProprioPerfil() throws Exception {
+		String token = entrar("admin", "admin12345");
+		long id = usuarios.findByLogin("admin").orElseThrow().getId();
+
+		mvc.perform(patch("/usuarios/{id}/perfil", id).header(HttpHeaders.AUTHORIZATION, bearer(token))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"perfil\": \"OPERADOR\"}"))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.detail").value("Não é possível alterar o próprio perfil"));
+	}
+
+	private void alterarAtivo(String tokenAdmin, long id, boolean ativo) throws Exception {
+		mvc.perform(patch("/usuarios/{id}/ativo", id).header(HttpHeaders.AUTHORIZATION, bearer(tokenAdmin))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"ativo\": %s}".formatted(ativo)))
+				.andExpect(status().isOk());
 	}
 }

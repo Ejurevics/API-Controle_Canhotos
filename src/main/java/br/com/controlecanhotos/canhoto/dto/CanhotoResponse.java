@@ -17,11 +17,11 @@ public record CanhotoResponse(
 		List<Registro> historico) {
 
 	public record Registro(StatusCanhoto statusAnterior, StatusCanhoto statusNovo, LocalDate dataRecebimento,
-			String observacao, boolean dataFuturaConfirmada, OffsetDateTime registradoEm) {
+			String observacao, boolean dataFuturaConfirmada, OffsetDateTime registradoEm, String registradoPor) {
 
 		static Registro de(HistoricoCanhoto h) {
 			return new Registro(h.getStatusAnterior(), h.getStatusNovo(), h.getDataRecebimento(),
-					h.getObservacao(), h.isDataFuturaConfirmada(), h.getRegistradoEm());
+					h.getObservacao(), h.isDataFuturaConfirmada(), h.getRegistradoEm(), h.getRegistradoPor());
 		}
 	}
 

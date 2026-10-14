@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
 import br.com.controlecanhotos.usuario.dto.AlterarAtivoRequest;
+import br.com.controlecanhotos.usuario.dto.AlterarPerfilRequest;
 import br.com.controlecanhotos.usuario.dto.CriarUsuarioRequest;
 import br.com.controlecanhotos.usuario.dto.RedefinirSenhaRequest;
 import br.com.controlecanhotos.usuario.dto.UsuarioResponse;
@@ -57,6 +58,12 @@ public class UsuarioController {
 	UsuarioResponse alterarAtivo(@PathVariable Long id, @RequestBody @Valid AlterarAtivoRequest request,
 			@AuthenticationPrincipal Jwt jwt) {
 		return service.alterarAtivo(id, request.ativo(), jwt.getSubject());
+	}
+
+	@PatchMapping("/{id}/perfil")
+	UsuarioResponse alterarPerfil(@PathVariable Long id, @RequestBody @Valid AlterarPerfilRequest request,
+			@AuthenticationPrincipal Jwt jwt) {
+		return service.alterarPerfil(id, request.perfil(), jwt.getSubject());
 	}
 
 	@PatchMapping("/{id}/senha")

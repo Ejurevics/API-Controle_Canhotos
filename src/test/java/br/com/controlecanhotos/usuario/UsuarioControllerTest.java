@@ -137,6 +137,25 @@ class UsuarioControllerTest {
 	}
 
 	@Test
+	void alteraPerfilEValidaOPedido() throws Exception {
+		long id = criar(novoLogin(), "OPERADOR");
+
+		mvc.perform(patch("/usuarios/{id}/perfil", id).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"perfil\": \"ADMIN\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.perfil").value("ADMIN"));
+		mvc.perform(patch("/usuarios/{id}/perfil", id).contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.erros.perfil").exists());
+		mvc.perform(patch("/usuarios/{id}/perfil", id).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"perfil\": \"CONSULTA\"}"))
+				.andExpect(status().isBadRequest());
+		mvc.perform(patch("/usuarios/{id}/perfil", 999_999).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"perfil\": \"ADMIN\"}"))
+				.andExpect(status().isNotFound());
+	}
+
+	@Test
 	void adminRedefineSenhaEOUsuarioEntraComANova() throws Exception {
 		String login = novoLogin();
 		long id = criar(login, "OPERADOR");

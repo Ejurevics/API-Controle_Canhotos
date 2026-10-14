@@ -2,7 +2,7 @@
 
 API REST para controle de coletas, cargas (CT-e) e devolução de canhotos (comprovantes de entrega assinados) em uma transportadora, com histórico de status por carga.
 
-**Versão atual: `v0.4.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas e várias NFs agrupadas por CT-e ([ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)), com validação da chave de acesso. Toda rota exige login (JWT, perfis ADMIN e OPERADOR, com gestão de usuários pela API; veja [Autenticação](#autenticação)).
+**Versão atual: `v0.5.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas e várias NFs agrupadas por CT-e ([ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)), com validação da chave de acesso. Toda rota exige login (JWT, perfis ADMIN e OPERADOR, com gestão de usuários pela API, limite de tentativas e revogação de tokens; veja [Autenticação](#autenticação)), e os históricos registram quem fez cada mudança.
 
 ## Modelo de domínio
 
@@ -85,8 +85,9 @@ erDiagram
 - O canhoto só pode ser registrado (`RECEBIDO` ou `DIVERGENTE`) com o CT-e (carga) `ENTREGUE`.
 - Data de recebimento posterior à data atual (no fuso `America/Sao_Paulo`, independente do fuso do servidor) gera aviso e só é aceita com confirmação explícita, que fica marcada no histórico do canhoto.
 - O canhoto pode ser registrado mais de uma vez (ex.: `DIVERGENTE` e depois `RECEBIDO`). Cada registro fica em `historico_canhoto` com status, data e observação; o canhoto guarda só o estado atual.
-- Toda mudança de status da carga gera um registro em `historico_status`.
-- Cargas criadas antes do agrupamento por CT-e foram migradas com uma chave de acesso **provisória** (prefixo `99` + id, `chaveProvisoria: true`). Ela é corrigida com `PATCH /cargas/{id}/chave-acesso`, que aceita só chave válida e ainda não usada e só vale para chave provisória (a definitiva não muda); `GET /cargas?chaveProvisoria=true` lista as pendentes.
+- Toda mudança de status da carga gera um registro em `historico_status`, e toda mudança de situação da coleta, em `historico_situacao_coleta` (`historico` em `GET /coletas/{id}`). Coletas anteriores à v0.5.0 começam com um registro da situação em que estavam, sem situação anterior.
+- Cada registro de histórico guarda o login de quem fez a mudança (`alteradoPor` na carga e na coleta, `registradoPor` no canhoto), tirado do token. Os registros iniciais ficam com quem criou a coleta. Registros gravados antes da v0.5.0 ficam com o campo nulo.
+- Cargas criadas antes do agrupamento por CT-e foram migradas com uma chave de acesso **provisória** (prefixo `99` + id, `chaveProvisoria: true`). Ela é corrigida com `PATCH /cargas/{id}/chave-acesso`, que aceita só chave válida e ainda não usada e só vale para chave provisória (a definitiva não muda); `GET /cargas?chaveProvisoria=true` lista as pendentes. A carga guarda a correção: `correcaoChave` em `GET /cargas/{id}` traz a chave provisória anterior, quando e por quem foi corrigida.
 
 ### Transições de status da carga
 
@@ -117,7 +118,7 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 |---|---|---|
 | `POST` | `/coletas` | Cria uma coleta com seus CT-es (cargas) e as NFs de cada um (`201` + `Location`) |
 | `GET` | `/coletas` | Lista coletas com filtros e paginação |
-| `GET` | `/coletas/{id}` | Busca a coleta com seus CT-es e NFs |
+| `GET` | `/coletas/{id}` | Busca a coleta com seus CT-es, NFs e o histórico de situação |
 | `PATCH` | `/coletas/{id}/situacao` | Altera a situação da coleta (`{"situacao": "..."}`) |
 | `GET` | `/cargas` | Lista cargas (CT-es) com filtros e paginação |
 | `GET` | `/cargas/{id}` | Busca a carga com as NFs e o histórico de status |
@@ -132,6 +133,7 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 | `GET` | `/usuarios` | Lista usuários com filtros e paginação. Só ADMIN |
 | `GET` | `/usuarios/{id}` | Busca um usuário. Só ADMIN |
 | `PATCH` | `/usuarios/{id}/ativo` | Desativa ou reativa um usuário (`{"ativo": false}`). Só ADMIN |
+| `PATCH` | `/usuarios/{id}/perfil` | Altera o perfil do usuário (`{"perfil": "ADMIN"}`). Só ADMIN |
 | `PATCH` | `/usuarios/{id}/senha` | Define uma nova senha para o usuário (`{"novaSenha": "..."}`, `204`). Só ADMIN |
 
 ### Autenticação
@@ -154,7 +156,9 @@ No Swagger, use o botão **Authorize** e cole o token.
 | `OPERADOR` | Coletas, cargas e canhotos: criar, consultar, listar, alterar status e situação, registrar canhoto. Trocar a própria senha |
 | `ADMIN` | Tudo do `OPERADOR`, mais corrigir a chave de acesso provisória (`PATCH /cargas/{id}/chave-acesso`) e gerenciar usuários (`/usuarios`) |
 
-Sem token, ou com token inválido ou expirado, a resposta é `401`; com perfil sem permissão, `403`. O token vale `JWT_EXPIRACAO` (1 hora por padrão). Login inexistente, usuário inativo e senha errada respondem igual (`401`, "Login ou senha inválidos").
+Sem token, ou com token inválido, expirado ou revogado, a resposta é `401`; com perfil sem permissão, `403`. O token vale `JWT_EXPIRACAO` (1 hora por padrão). Login inexistente, usuário inativo e senha errada respondem igual (`401`, "Login ou senha inválidos").
+
+Limite de tentativas ([ADR 0003](docs/adr/0003-limite-tentativas-login.md)): 5 falhas de um mesmo login, ou 20 de um mesmo IP, em 15 minutos bloqueiam novas tentativas até a janela acabar. A resposta é `429` com `Retry-After`, e nem a senha certa entra durante o bloqueio. Login certo zera as falhas do login. Os contadores ficam em memória e zeram ao reiniciar a aplicação. Atrás de proxy ou NAT (inclusive o Docker Desktop), vários clientes podem chegar com o mesmo IP; veja o ADR.
 
 #### Gestão de usuários
 
@@ -167,8 +171,9 @@ curl -s -X POST http://localhost:8080/usuarios \
 - Login: de 3 a 50 caracteres (letras, números, `.`, `-` e `_`), guardado em minúsculas e sem espaços nas pontas; repetido responde `422`.
 - Senha: de 8 a 72 caracteres e no máximo 72 bytes em UTF-8 (limite do BCrypt). A resposta nunca traz a senha nem o hash.
 - Usuários não são apagados, só desativados: usuário inativo não entra. Ninguém desativa o próprio usuário, e o último ADMIN ativo não pode ser desativado (`422`).
+- Perfil: ninguém altera o próprio, e o último ADMIN ativo não pode virar OPERADOR (`422`). A troca derruba os tokens do usuário, que entra de novo já com o perfil novo; pedir o perfil que ele já tem não muda nada.
 - Trocar a senha (`PATCH /auth/senha`) exige a senha atual; errada responde `422`.
-- Desativar o usuário ou trocar a senha não invalida tokens já emitidos: eles valem até expirar (risco aceito no ADR 0002).
+- Desativar o usuário ou trocar a senha (pelo próprio usuário ou pelo ADMIN) derruba na hora todos os tokens já emitidos para ele, inclusive o usado na troca: é preciso entrar de novo. Reativar não devolve os tokens antigos ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
 
 ### Listagens
 
@@ -230,6 +235,7 @@ Erros seguem o formato `ProblemDetail` (RFC 9457):
 | `404` | Recurso não encontrado |
 | `409` | Confirmação necessária (`confirmacaoNecessaria: true`) ou violação de integridade |
 | `422` | Regra de negócio violada (ex.: CT-e já cadastrado, NF repetida no mesmo CT-e) |
+| `429` | Muitas tentativas de login com erro; `Retry-After` diz em quantos segundos tentar de novo |
 
 ## Stack
 
@@ -298,6 +304,9 @@ Copie `.env.example` para `.env` e preencha. O `docker compose` lê o `.env` aut
 | `ADMIN_LOGIN` | `admin` | Login do primeiro ADMIN, criado na subida se ainda não houver nenhum |
 | `ADMIN_NOME` | `Administrador` | Nome do primeiro ADMIN |
 | `ADMIN_SENHA` | — (obrigatória) | Senha do primeiro ADMIN, com pelo menos 8 caracteres. Ignorada depois que o ADMIN existe |
+| `LOGIN_MAX_FALHAS_POR_LOGIN` | `5` | Falhas de login permitidas por login dentro da janela |
+| `LOGIN_MAX_FALHAS_POR_IP` | `20` | Falhas de login permitidas por IP dentro da janela |
+| `LOGIN_JANELA` | `PT15M` | Janela do limite de tentativas, em ISO-8601 (`PT15M` = 15 minutos) |
 
 Perfis Spring:
 
@@ -312,7 +321,7 @@ src/main/java/br/com/controlecanhotos/
 ├── carga/         Carga (CT-e), status, regras de transição e DTOs
 ├── notafiscal/    Nota fiscal (de 1 a N por CT-e) e DTOs
 ├── canhoto/       Canhoto (um por NF), status, service, controllers e DTOs
-├── historico/     Histórico de status da carga e de registros do canhoto
+├── historico/     Histórico de situação da coleta, de status da carga e de registros do canhoto
 ├── usuario/       Usuário, perfil (ADMIN, OPERADOR) e gestão de usuários
 ├── seguranca/     Login, emissão e validação do JWT, regras de acesso e ADMIN inicial
 └── shared/        Exceções, tratamento global de erros (ApiExceptionHandler) e paginação
@@ -327,7 +336,7 @@ docs/adr/          Decisões de arquitetura (ADRs)
 
 ## Fluxo de desenvolvimento
 
-- `main`: versões estáveis, marcadas com tag (`v0.4.0`). Só recebe a `develop` via PR de release, com merge commit.
+- `main`: versões estáveis, marcadas com tag (`v0.5.0`). Só recebe a `develop` via PR de release, com merge commit.
 - `develop`: integração. Recebe os PRs de feature, com squash.
 - Branches de trabalho nascem da `develop` (`feat/`, `fix/`, `chore/`, `docs/`, `refactor/`) e são apagadas após o merge.
 - Commits seguem Conventional Commits (`feat(coleta): adiciona ...`).
@@ -340,4 +349,9 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Regra para concluir uma coleta com base no status das cargas.
 - [x] Autenticação com JWT e perfis ADMIN e OPERADOR ([ADR 0002](docs/adr/0002-autenticacao-jwt.md)).
 - [x] Gestão de usuários pela API (criar, listar, desativar, trocar senha).
+- [x] Histórico da carga e do canhoto registra o usuário que fez cada mudança.
+- [x] Limite de tentativas de login por login e por IP ([ADR 0003](docs/adr/0003-limite-tentativas-login.md)).
+- [x] Revogar os tokens de quem é desativado ou troca a senha ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
+- [x] Alterar o perfil de um usuário.
+- [x] Histórico de situação da coleta e registro da correção da chave provisória, com o usuário.
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).

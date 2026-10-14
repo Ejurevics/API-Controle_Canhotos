@@ -50,16 +50,18 @@ public class CargaService {
 	public CargaDetalheResponse alterarStatus(Long id, AlterarStatusRequest request) {
 		Carga carga = obter(id);
 		carga.alterarStatus(request.status(), request.motivo());
+		// Grava antes de montar a resposta: data e usuário do histórico novo só são preenchidos na gravação.
+		cargaRepository.flush();
 		return CargaDetalheResponse.de(carga);
 	}
 
 	@Transactional
-	public CargaDetalheResponse corrigirChaveAcesso(Long id, String novaChave) {
+	public CargaDetalheResponse corrigirChaveAcesso(Long id, String novaChave, String loginDoSolicitante) {
 		Carga carga = obter(id);
 		if (carga.isChaveProvisoria() && cargaRepository.existsByChaveAcesso(novaChave)) {
 			throw new RegraNegocioException("CT-e já cadastrado: " + novaChave);
 		}
-		carga.corrigirChaveAcesso(novaChave);
+		carga.corrigirChaveAcesso(novaChave, loginDoSolicitante);
 		return CargaDetalheResponse.de(carga);
 	}
 

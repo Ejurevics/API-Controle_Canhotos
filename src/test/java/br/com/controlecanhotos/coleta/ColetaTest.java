@@ -2,6 +2,7 @@ package br.com.controlecanhotos.coleta;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.time.LocalDate;
 
@@ -33,6 +34,21 @@ class ColetaTest {
 		coleta.alterarSituacao(SituacaoColeta.CONCLUIDA);
 
 		assertThat(coleta.getSituacao()).isEqualTo(SituacaoColeta.CONCLUIDA);
+		assertThat(coleta.getHistorico())
+				.extracting(h -> h.getSituacaoAnterior(), h -> h.getSituacaoNova())
+				.containsExactly(
+						tuple(null, SituacaoColeta.PROGRAMADA),
+						tuple(SituacaoColeta.PROGRAMADA, SituacaoColeta.EM_ANDAMENTO),
+						tuple(SituacaoColeta.EM_ANDAMENTO, SituacaoColeta.CONCLUIDA));
+	}
+
+	@Test
+	void transicaoRecusadaNaoEntraNoHistorico() {
+		Coleta coleta = novaColeta();
+
+		assertThatThrownBy(() -> coleta.alterarSituacao(SituacaoColeta.CONCLUIDA))
+				.isInstanceOf(RegraNegocioException.class);
+		assertThat(coleta.getHistorico()).hasSize(1);
 	}
 
 	@Test

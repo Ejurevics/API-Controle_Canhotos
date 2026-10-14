@@ -44,6 +44,7 @@ public class TokenService {
 				.expiresAt(expiraEm)
 				.claim(SegurancaConfig.CLAIM_PERFIL, usuario.getPerfil().name())
 				.claim("nome", usuario.getNome())
+				.claim(SegurancaConfig.CLAIM_VERSAO_CREDENCIAL, usuario.getVersaoCredencial())
 				.build();
 		JwsHeader cabecalho = JwsHeader.with(MacAlgorithm.HS256).build();
 		String valor = encoder.encode(JwtEncoderParameters.from(cabecalho, claims)).getTokenValue();

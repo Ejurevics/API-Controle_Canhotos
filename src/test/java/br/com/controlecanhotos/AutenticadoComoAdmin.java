@@ -11,14 +11,17 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 /**
  * Faz toda requisição do MockMvc sair autenticada como ADMIN, para os testes de regra de negócio não
  * repetirem o login. Autenticação e permissões por perfil são testadas em {@code SegurancaTest}, sem isto.
+ * O login é o do ADMIN inicial do perfil dev, que existe no banco (o histórico guarda o login com FK).
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class AutenticadoComoAdmin {
 
+	public static final String LOGIN = "admin";
+
 	@Bean
 	MockMvcBuilderCustomizer requisicoesComoAdmin() {
 		return builder -> builder.defaultRequest(get("/")
-				.with(jwt().jwt(j -> j.subject("admin-dos-testes"))
+				.with(jwt().jwt(j -> j.subject(LOGIN))
 						.authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))));
 	}
 }

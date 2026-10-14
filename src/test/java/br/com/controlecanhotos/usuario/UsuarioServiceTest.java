@@ -94,7 +94,9 @@ class UsuarioServiceTest {
 		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(operador));
 
 		assertThat(service.alterarAtivo(1L, false, "admin").ativo()).isFalse();
+		assertThat(operador.getVersaoCredencial()).as("desativar derruba os tokens").isEqualTo(1);
 		assertThat(service.alterarAtivo(1L, true, "admin").ativo()).isTrue();
+		assertThat(operador.getVersaoCredencial()).as("reativar não devolve os tokens").isEqualTo(1);
 	}
 
 	@Test
@@ -130,6 +132,57 @@ class UsuarioServiceTest {
 	}
 
 	@Test
+	void alteraPerfilEDerrubaOsTokens() {
+		Usuario operador = usuario("operador", Perfil.OPERADOR);
+		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(operador));
+
+		assertThat(service.alterarPerfil(1L, Perfil.ADMIN, "admin").perfil()).isEqualTo(Perfil.ADMIN);
+		assertThat(operador.getVersaoCredencial()).isEqualTo(1);
+	}
+
+	@Test
+	void mesmoPerfilNaoMudaNada() {
+		Usuario admin = usuario("admin", Perfil.ADMIN);
+		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+		assertThat(service.alterarPerfil(1L, Perfil.ADMIN, "admin").perfil()).isEqualTo(Perfil.ADMIN);
+		assertThat(admin.getVersaoCredencial()).isZero();
+	}
+
+	@Test
+	void naoAlteraOProprioPerfil() {
+		Usuario admin = usuario("admin", Perfil.ADMIN);
+		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+		assertThatThrownBy(() -> service.alterarPerfil(1L, Perfil.OPERADOR, "Admin"))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessage("Não é possível alterar o próprio perfil");
+		assertThat(admin.getPerfil()).isEqualTo(Perfil.ADMIN);
+	}
+
+	@Test
+	void naoRebaixaOUltimoAdminAtivo() {
+		Usuario admin = usuario("outro-admin", Perfil.ADMIN);
+		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(admin));
+		when(usuarioRepository.countByPerfilAndAtivoTrue(Perfil.ADMIN)).thenReturn(1L);
+
+		assertThatThrownBy(() -> service.alterarPerfil(1L, Perfil.OPERADOR, "admin"))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessage("Não é possível rebaixar o último ADMIN ativo");
+		assertThat(admin.getPerfil()).isEqualTo(Perfil.ADMIN);
+	}
+
+	@Test
+	void rebaixaAdminInativoSemContarOsAtivos() {
+		Usuario admin = usuario("admin-inativo", Perfil.ADMIN);
+		admin.desativar();
+		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+		assertThat(service.alterarPerfil(1L, Perfil.OPERADOR, "admin").perfil()).isEqualTo(Perfil.OPERADOR);
+		verify(usuarioRepository, never()).countByPerfilAndAtivoTrue(any());
+	}
+
+	@Test
 	void adminRedefineSenhaDeOutroUsuario() {
 		Usuario operador = usuario("operador", Perfil.OPERADOR);
 		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(operador));
@@ -138,6 +191,7 @@ class UsuarioServiceTest {
 		service.redefinirSenha(1L, "nova-senha-1");
 
 		assertThat(operador.getSenhaHash()).isEqualTo("hash-novo");
+		assertThat(operador.getVersaoCredencial()).isEqualTo(1);
 	}
 
 	@Test

@@ -160,10 +160,12 @@ class CargaServiceTest {
 	void corrigeChaveProvisoria() {
 		when(cargaRepository.findById(1L)).thenReturn(Optional.of(CargaTest.cargaMigrada()));
 
-		CargaDetalheResponse resposta = service.corrigirChaveAcesso(1L, Cte.chave(7));
+		CargaDetalheResponse resposta = service.corrigirChaveAcesso(1L, Cte.chave(7), "admin");
 
 		assertThat(resposta.chaveAcesso()).isEqualTo(Cte.chave(7));
 		assertThat(resposta.chaveProvisoria()).isFalse();
+		assertThat(resposta.correcaoChave().corrigidaPor()).isEqualTo("admin");
+		assertThat(resposta.correcaoChave().chaveAnterior()).startsWith("99");
 	}
 
 	@Test
@@ -173,7 +175,7 @@ class CargaServiceTest {
 		when(cargaRepository.findById(1L)).thenReturn(Optional.of(carga));
 		when(cargaRepository.existsByChaveAcesso(Cte.chave(7))).thenReturn(true);
 
-		assertThatThrownBy(() -> service.corrigirChaveAcesso(1L, Cte.chave(7)))
+		assertThatThrownBy(() -> service.corrigirChaveAcesso(1L, Cte.chave(7), "admin"))
 				.isInstanceOf(RegraNegocioException.class)
 				.hasMessageContaining("CT-e já cadastrado");
 		assertThat(carga.getChaveAcesso()).isEqualTo(chaveOriginal);
@@ -184,7 +186,7 @@ class CargaServiceTest {
 	void naoCorrigeChaveDefinitivaNemConsultaDuplicidade() {
 		when(cargaRepository.findById(1L)).thenReturn(Optional.of(novaCarga()));
 
-		assertThatThrownBy(() -> service.corrigirChaveAcesso(1L, Cte.chave(7)))
+		assertThatThrownBy(() -> service.corrigirChaveAcesso(1L, Cte.chave(7), "admin"))
 				.isInstanceOf(RegraNegocioException.class)
 				.hasMessageContaining("já é definitiva");
 		verify(cargaRepository, never()).existsByChaveAcesso(any());
@@ -194,7 +196,7 @@ class CargaServiceTest {
 	void corrigirChaveDeCargaInexistenteLancaNaoEncontrado() {
 		when(cargaRepository.findById(99L)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.corrigirChaveAcesso(99L, Cte.chave(7)))
+		assertThatThrownBy(() -> service.corrigirChaveAcesso(99L, Cte.chave(7), "admin"))
 				.isInstanceOf(RecursoNaoEncontradoException.class);
 	}
 }

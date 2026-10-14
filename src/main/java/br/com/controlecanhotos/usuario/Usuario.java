@@ -36,6 +36,9 @@ public class Usuario {
 
 	private boolean ativo;
 
+	/** Vai no token; mudar o valor invalida os tokens já emitidos (ADR 0004). */
+	private int versaoCredencial;
+
 	@CreationTimestamp
 	@Column(updatable = false)
 	private OffsetDateTime criadoEm;
@@ -60,17 +63,32 @@ public class Usuario {
 		return login == null ? null : login.strip().toLowerCase();
 	}
 
+	/** Também invalida os tokens já emitidos; reativar não os devolve. */
 	public void desativar() {
 		ativo = false;
+		invalidarTokens();
 	}
 
 	public void ativar() {
 		ativo = true;
 	}
 
-	/** {@code senhaHash} já vem codificada (BCrypt). */
+	/** {@code senhaHash} já vem codificada (BCrypt). Invalida os tokens já emitidos, inclusive o atual. */
 	public void alterarSenha(String senhaHash) {
 		this.senhaHash = senhaHash;
+		invalidarTokens();
+	}
+
+	/** Invalida os tokens já emitidos, que levam o perfil antigo; o mesmo perfil não muda nada. */
+	public void alterarPerfil(Perfil novoPerfil) {
+		if (novoPerfil != perfil) {
+			perfil = novoPerfil;
+			invalidarTokens();
+		}
+	}
+
+	private void invalidarTokens() {
+		versaoCredencial++;
 	}
 
 	public Long getId() {
@@ -95,6 +113,10 @@ public class Usuario {
 
 	public boolean isAtivo() {
 		return ativo;
+	}
+
+	public int getVersaoCredencial() {
+		return versaoCredencial;
 	}
 
 	public OffsetDateTime getCriadoEm() {

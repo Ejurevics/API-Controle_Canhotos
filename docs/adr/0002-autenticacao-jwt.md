@@ -25,8 +25,8 @@ Rotas públicas: `POST /auth/login`, `/actuator/health` e a documentação (`/sw
 - **Positivas:** toda operação exige usuário identificado; permissões por perfil; nenhuma dependência externa.
 - **Negativas:** o `docker compose` deixa de subir sem configuração (é preciso copiar `.env.example` para `.env` e preencher dois valores); os clientes da API passam a precisar de login.
 - **Riscos aceitos:**
-  - Token não é revogável antes de expirar: desativar um usuário bloqueia novos logins, mas um token já emitido vale até a expiração (1 hora por padrão).
-  - Sem limite de tentativas de login (rate limiting) nesta versão.
+  - Token não é revogável antes de expirar: desativar um usuário bloqueia novos logins, mas um token já emitido vale até a expiração (1 hora por padrão). Tratado depois no [ADR 0004](0004-revogar-tokens-por-versao-de-credencial.md).
+  - Sem limite de tentativas de login (rate limiting) nesta versão. Tratado depois no [ADR 0003](0003-limite-tentativas-login.md).
   - Segredo simétrico (HS256): quem valida também consegue emitir. Aceitável com um único serviço.
 
 ## Alternativas descartadas
@@ -49,4 +49,4 @@ Rotas públicas: `POST /auth/login`, `/actuator/health` e a documentação (`/sw
 - Usuários não são apagados, só desativados, para não perder a referência de quem existiu.
 - Ninguém desativa o próprio usuário, e o último ADMIN ativo não pode ser desativado: sem ele ninguém mais gerencia usuários, e o ADMIN inicial só é recriado quando não existe ADMIN nenhum.
 - Senha de 8 a 72 caracteres e no máximo 72 bytes em UTF-8, o limite do BCrypt.
-- Trocar o perfil de um usuário fica de fora por enquanto (não estava no escopo).
+- Trocar o perfil de um usuário fica de fora por enquanto (não estava no escopo). Adicionado depois em `PATCH /usuarios/{id}/perfil`, com as mesmas travas da desativação (ninguém altera o próprio perfil; o último ADMIN ativo não vira OPERADOR) e revogando os tokens do usuário ([ADR 0004](0004-revogar-tokens-por-versao-de-credencial.md)).
