@@ -1,6 +1,5 @@
 package br.com.controlecanhotos.coleta;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -65,10 +64,8 @@ public class Coleta {
 		this.situacao = SituacaoColeta.PROGRAMADA;
 	}
 
-	public Carga adicionarCarga(String emitenteCnpj, short serieNotaFiscal, int numeroNotaFiscal,
-			BigDecimal pesoKg, String cidadeDestino, String ufDestino) {
-		Carga carga = new Carga(this, emitenteCnpj, serieNotaFiscal, numeroNotaFiscal,
-				pesoKg, cidadeDestino, ufDestino);
+	public Carga adicionarCarga(String chaveAcesso, String cidadeDestino, String ufDestino) {
+		Carga carga = new Carga(this, chaveAcesso, cidadeDestino, ufDestino);
 		cargas.add(carga);
 		return carga;
 	}
@@ -87,11 +84,11 @@ public class Coleta {
 	private void exigirCargasFinalizadas() {
 		String pendentes = cargas.stream()
 				.filter(carga -> !carga.getStatus().finalizada())
-				.map(carga -> "%d (%s)".formatted(carga.getNumeroNotaFiscal(), carga.getStatus()))
+				.map(carga -> "%s (%s)".formatted(carga.getChaveAcesso(), carga.getStatus()))
 				.collect(Collectors.joining(", "));
 		if (!pendentes.isEmpty()) {
 			throw new RegraNegocioException(
-					"Coleta só pode ser concluída com todas as cargas ENTREGUE ou DEVOLVIDA; pendentes (NF): "
+					"Coleta só pode ser concluída com todas as cargas ENTREGUE ou DEVOLVIDA; pendentes (CT-e): "
 							+ pendentes);
 		}
 	}

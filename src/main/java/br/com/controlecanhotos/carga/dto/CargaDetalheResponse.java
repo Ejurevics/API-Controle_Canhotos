@@ -4,22 +4,21 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 
-import br.com.controlecanhotos.canhoto.StatusCanhoto;
 import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.historico.HistoricoStatus;
+import br.com.controlecanhotos.notafiscal.dto.NotaFiscalResponse;
 
 public record CargaDetalheResponse(
 		Long id,
 		Long coletaId,
-		String emitenteCnpj,
-		short serieNotaFiscal,
-		int numeroNotaFiscal,
-		BigDecimal pesoKg,
+		String chaveAcesso,
+		boolean chaveProvisoria,
 		String cidadeDestino,
 		String ufDestino,
 		StatusCarga status,
-		StatusCanhoto statusCanhoto,
+		BigDecimal pesoTotalKg,
+		List<NotaFiscalResponse> notasFiscais,
 		List<Historico> historico) {
 
 	public record Historico(StatusCarga statusAnterior, StatusCarga statusNovo,
@@ -31,9 +30,9 @@ public record CargaDetalheResponse(
 	}
 
 	public static CargaDetalheResponse de(Carga carga) {
-		return new CargaDetalheResponse(carga.getId(), carga.getColeta().getId(), carga.getEmitenteCnpj(),
-				carga.getSerieNotaFiscal(), carga.getNumeroNotaFiscal(), carga.getPesoKg(),
-				carga.getCidadeDestino(), carga.getUfDestino(), carga.getStatus(),
-				carga.getCanhoto().getStatus(), carga.getHistorico().stream().map(Historico::de).toList());
+		return new CargaDetalheResponse(carga.getId(), carga.getColeta().getId(), carga.getChaveAcesso(),
+				carga.isChaveProvisoria(), carga.getCidadeDestino(), carga.getUfDestino(), carga.getStatus(),
+				carga.getPesoTotalKg(), carga.getNotasFiscais().stream().map(NotaFiscalResponse::de).toList(),
+				carga.getHistorico().stream().map(Historico::de).toList());
 	}
 }

@@ -7,13 +7,14 @@ import java.util.Collections;
 import java.util.List;
 
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
-import br.com.controlecanhotos.canhoto.Canhoto;
 import br.com.controlecanhotos.coleta.Coleta;
 import br.com.controlecanhotos.historico.HistoricoStatus;
+import br.com.controlecanhotos.notafiscal.NotaFiscal;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -27,9 +28,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
 
+/**
+ * Carga transportada, identificada pelo CT-e (chave de acesso de 44 dígitos). Agrupa de 1 a N notas fiscais.
+ */
 @Entity
 public class Carga {
 
@@ -42,14 +45,10 @@ public class Carga {
 	private Coleta coleta;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
-	@Column(length = 14)
-	private String emitenteCnpj;
+	@Column(length = 44)
+	private String chaveAcesso;
 
-	private short serieNotaFiscal;
-
-	private int numeroNotaFiscal;
-
-	private BigDecimal pesoKg;
+	private boolean chaveProvisoria;
 
 	private String cidadeDestino;
 
@@ -60,12 +59,22 @@ public class Carga {
 	@Enumerated(EnumType.STRING)
 	private StatusCarga status;
 
-	@OneToOne(mappedBy = "carga", cascade = CascadeType.ALL, optional = false)
-	private Canhoto canhoto;
+	@OneToMany(mappedBy = "carga", cascade = CascadeType.ALL)
+	@OrderBy("id")
+	private List<NotaFiscal> notasFiscais = new ArrayList<>();
 
 	@OneToMany(mappedBy = "carga", cascade = CascadeType.ALL)
 	@OrderBy("alteradoEm, id")
 	private List<HistoricoStatus> historico = new ArrayList<>();
+
+	/** Somente leitura: calculado pelo banco para as listagens não carregarem as notas de cada carga. */
+	@Formula("(select count(*) from nota_fiscal nf where nf.carga_id = id)")
+	private int quantidadeNotasFiscais;
+
+	/** Somente leitura: calculado pelo banco, como {@link #quantidadeNotasFiscais}. */
+	@Formula("(select count(*) from nota_fiscal nf join canhoto c on c.nota_fiscal_id = nf.id "
+			+ "where nf.carga_id = id and c.status = 'PENDENTE')")
+	private int canhotosPendentes;
 
 	@CreationTimestamp
 	@Column(updatable = false)
@@ -77,18 +86,26 @@ public class Carga {
 	protected Carga() {
 	}
 
-	public Carga(Coleta coleta, String emitenteCnpj, short serieNotaFiscal, int numeroNotaFiscal,
-			BigDecimal pesoKg, String cidadeDestino, String ufDestino) {
+	public Carga(Coleta coleta, String chaveAcesso, String cidadeDestino, String ufDestino) {
 		this.coleta = coleta;
-		this.emitenteCnpj = emitenteCnpj;
-		this.serieNotaFiscal = serieNotaFiscal;
-		this.numeroNotaFiscal = numeroNotaFiscal;
-		this.pesoKg = pesoKg;
+		this.chaveAcesso = chaveAcesso;
 		this.cidadeDestino = cidadeDestino;
 		this.ufDestino = ufDestino;
 		this.status = StatusCarga.AGUARDANDO_COLETA;
-		this.canhoto = new Canhoto(this);
 		this.historico.add(new HistoricoStatus(this, null, status, "Carga registrada"));
+	}
+
+	public NotaFiscal adicionarNotaFiscal(String emitenteCnpj, short serieNotaFiscal, int numeroNotaFiscal,
+			BigDecimal pesoKg) {
+		boolean repetida = notasFiscais.stream()
+				.anyMatch(nota -> nota.corresponde(emitenteCnpj, serieNotaFiscal, numeroNotaFiscal));
+		if (repetida) {
+			throw new RegraNegocioException("Nota fiscal repetida no CT-e %s: %s/%d/%d".formatted(
+					chaveAcesso, emitenteCnpj, serieNotaFiscal, numeroNotaFiscal));
+		}
+		NotaFiscal nota = new NotaFiscal(this, emitenteCnpj, serieNotaFiscal, numeroNotaFiscal, pesoKg);
+		notasFiscais.add(nota);
+		return nota;
 	}
 
 	public void alterarStatus(StatusCarga novoStatus, String motivo) {
@@ -103,6 +120,10 @@ public class Carga {
 		status = novoStatus;
 	}
 
+	public BigDecimal getPesoTotalKg() {
+		return notasFiscais.stream().map(NotaFiscal::getPesoKg).reduce(BigDecimal.ZERO, BigDecimal::add);
+	}
+
 	public Long getId() {
 		return id;
 	}
@@ -111,20 +132,12 @@ public class Carga {
 		return coleta;
 	}
 
-	public String getEmitenteCnpj() {
-		return emitenteCnpj;
+	public String getChaveAcesso() {
+		return chaveAcesso;
 	}
 
-	public short getSerieNotaFiscal() {
-		return serieNotaFiscal;
-	}
-
-	public int getNumeroNotaFiscal() {
-		return numeroNotaFiscal;
-	}
-
-	public BigDecimal getPesoKg() {
-		return pesoKg;
+	public boolean isChaveProvisoria() {
+		return chaveProvisoria;
 	}
 
 	public String getCidadeDestino() {
@@ -139,12 +152,22 @@ public class Carga {
 		return status;
 	}
 
-	public Canhoto getCanhoto() {
-		return canhoto;
+	public List<NotaFiscal> getNotasFiscais() {
+		return Collections.unmodifiableList(notasFiscais);
 	}
 
 	public List<HistoricoStatus> getHistorico() {
 		return Collections.unmodifiableList(historico);
+	}
+
+	/** Só tem valor em cargas lidas do banco; use {@code getNotasFiscais().size()} em cargas em memória. */
+	public int getQuantidadeNotasFiscais() {
+		return quantidadeNotasFiscais;
+	}
+
+	/** Só tem valor em cargas lidas do banco, como {@link #getQuantidadeNotasFiscais()}. */
+	public int getCanhotosPendentes() {
+		return canhotosPendentes;
 	}
 
 	public OffsetDateTime getCriadoEm() {

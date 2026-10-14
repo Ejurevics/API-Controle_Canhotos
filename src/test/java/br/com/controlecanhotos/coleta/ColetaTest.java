@@ -3,13 +3,13 @@ package br.com.controlecanhotos.coleta;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
@@ -59,8 +59,7 @@ class ColetaTest {
 	}
 
 	private Carga adicionarCarga(Coleta coleta, int numeroNotaFiscal) {
-		return coleta.adicionarCarga("11111111000111", (short) 1, numeroNotaFiscal, BigDecimal.TEN,
-				"Campinas", "SP");
+		return Cte.cargaComUmaNota(coleta, numeroNotaFiscal);
 	}
 
 	private void entregar(Carga carga) {
@@ -111,9 +110,9 @@ class ColetaTest {
 
 		assertThatThrownBy(() -> coleta.alterarSituacao(SituacaoColeta.CONCLUIDA))
 				.isInstanceOf(RegraNegocioException.class)
-				.hasMessageContaining("1002 (AGUARDANDO_COLETA)")
-				.hasMessageContaining("1003 (EM_TRANSITO)")
-				.hasMessageNotContaining("1001");
+				.hasMessageContaining(Cte.chave(1002) + " (AGUARDANDO_COLETA)")
+				.hasMessageContaining(Cte.chave(1003) + " (EM_TRANSITO)")
+				.hasMessageNotContaining(Cte.chave(1001));
 		assertThat(coleta.getSituacao()).isEqualTo(SituacaoColeta.EM_ANDAMENTO);
 	}
 
@@ -126,7 +125,7 @@ class ColetaTest {
 
 		assertThatThrownBy(() -> coleta.alterarSituacao(SituacaoColeta.CONCLUIDA))
 				.isInstanceOf(RegraNegocioException.class)
-				.hasMessageContaining("1001 (OCORRENCIA)");
+				.hasMessageContaining(Cte.chave(1001) + " (OCORRENCIA)");
 	}
 
 	@Test

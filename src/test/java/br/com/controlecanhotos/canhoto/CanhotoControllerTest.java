@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.jayway.jsonpath.JsonPath;
 
+import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.TestcontainersConfiguration;
 
 @SpringBootTest
@@ -33,24 +34,25 @@ class CanhotoControllerTest {
 	@Autowired
 	private MockMvc mvc;
 
-	private long criarCarga(String... statusSequencia) throws Exception {
+	private long criarNota(String... statusSequencia) throws Exception {
+		int numeroNf = NUMERO_NF.incrementAndGet();
 		String body = """
 				{"clienteNome": "Cliente C", "clienteCnpj": "44444444000144", "dataProgramada": "2026-10-20",
-				 "cargas": [{"numeroNotaFiscal": %d, "pesoKg": 10, "cidadeDestino": "Santos",
-				 "ufDestino": "SP"}]}
-				""".formatted(NUMERO_NF.incrementAndGet());
+				 "cargas": [{"chaveAcesso": "%s", "cidadeDestino": "Santos", "ufDestino": "SP",
+				 "notasFiscais": [{"numeroNotaFiscal": %d, "pesoKg": 10}]}]}
+				""".formatted(Cte.chave(numeroNf), numeroNf);
 		String resposta = mvc.perform(post("/coletas").contentType(MediaType.APPLICATION_JSON).content(body))
 				.andReturn().getResponse().getContentAsString();
-		long id = ((Number) JsonPath.read(resposta, "$.cargas[0].id")).longValue();
+		long cargaId = ((Number) JsonPath.read(resposta, "$.cargas[0].id")).longValue();
 		for (String novoStatus : statusSequencia) {
-			mvc.perform(patch("/cargas/{id}/status", id).contentType(MediaType.APPLICATION_JSON)
+			mvc.perform(patch("/cargas/{id}/status", cargaId).contentType(MediaType.APPLICATION_JSON)
 					.content("{\"status\": \"%s\"}".formatted(novoStatus))).andExpect(status().isOk());
 		}
-		return id;
+		return ((Number) JsonPath.read(resposta, "$.cargas[0].notasFiscais[0].id")).longValue();
 	}
 
-	private long criarCargaEntregue() throws Exception {
-		return criarCarga("COLETADA", "EM_TRANSITO", "ENTREGUE");
+	private long criarNotaEntregue() throws Exception {
+		return criarNota("COLETADA", "EM_TRANSITO", "ENTREGUE");
 	}
 
 	/** Mesmo fuso que a API usa para decidir se a data é futura (o CI roda em UTC). */
@@ -66,31 +68,31 @@ class CanhotoControllerTest {
 
 	@Test
 	void registraRecebimento() throws Exception {
-		long id = criarCargaEntregue();
+		long id = criarNotaEntregue();
 
-		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(post("/notas-fiscais/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("RECEBIDO", hoje(), null, null)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("RECEBIDO"))
 				.andExpect(jsonPath("$.dataRecebimento").value(hoje().toString()))
 				.andExpect(jsonPath("$.historico.length()").value(2));
 
-		mvc.perform(get("/cargas/{id}/canhoto", id))
+		mvc.perform(get("/notas-fiscais/{id}/canhoto", id))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("RECEBIDO"));
 	}
 
 	@Test
 	void divergenciaDepoisRecebimentoPreservaHistorico() throws Exception {
-		long id = criarCargaEntregue();
+		long id = criarNotaEntregue();
 
-		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(post("/notas-fiscais/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("DIVERGENTE", hoje(), "Assinatura ilegível", false)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("DIVERGENTE"))
 				.andExpect(jsonPath("$.observacao").value("Assinatura ilegível"));
 
-		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(post("/notas-fiscais/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("RECEBIDO", hoje(), null, false)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("RECEBIDO"))
@@ -101,9 +103,9 @@ class CanhotoControllerTest {
 
 	@Test
 	void divergenciaExigeObservacao() throws Exception {
-		long id = criarCargaEntregue();
+		long id = criarNotaEntregue();
 
-		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(post("/notas-fiscais/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("DIVERGENTE", hoje(), null, false)))
 				.andExpect(status().isUnprocessableContent())
 				.andExpect(jsonPath("$.detail").value(containsString("Observação")));
@@ -111,9 +113,9 @@ class CanhotoControllerTest {
 
 	@Test
 	void exigeCargaEntregue() throws Exception {
-		long id = criarCarga("COLETADA");
+		long id = criarNota("COLETADA");
 
-		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(post("/notas-fiscais/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("RECEBIDO", hoje(), null, false)))
 				.andExpect(status().isUnprocessableContent())
 				.andExpect(jsonPath("$.detail").value(containsString("ENTREGUE")));
@@ -121,18 +123,18 @@ class CanhotoControllerTest {
 
 	@Test
 	void dataFuturaPedeConfirmacaoEPassaQuandoConfirmada() throws Exception {
-		long id = criarCargaEntregue();
+		long id = criarNotaEntregue();
 		LocalDate futura = hoje().plusDays(30);
 
-		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(post("/notas-fiscais/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("RECEBIDO", futura, null, false)))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.confirmacaoNecessaria").value(true));
 
-		mvc.perform(get("/cargas/{id}/canhoto", id))
+		mvc.perform(get("/notas-fiscais/{id}/canhoto", id))
 				.andExpect(jsonPath("$.status").value("PENDENTE"));
 
-		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(post("/notas-fiscais/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("RECEBIDO", futura, null, true)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("RECEBIDO"))
@@ -141,18 +143,18 @@ class CanhotoControllerTest {
 
 	@Test
 	void naoPermiteRegistrarComoPendente() throws Exception {
-		long id = criarCargaEntregue();
+		long id = criarNotaEntregue();
 
-		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(post("/notas-fiscais/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("PENDENTE", hoje(), null, false)))
 				.andExpect(status().isUnprocessableContent());
 	}
 
 	@Test
 	void validaCamposObrigatorios() throws Exception {
-		long id = criarCargaEntregue();
+		long id = criarNotaEntregue();
 
-		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(post("/notas-fiscais/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
 				.content("{}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.erros.status").exists())
@@ -161,8 +163,8 @@ class CanhotoControllerTest {
 
 	@Test
 	void retorna404ParaCargaInexistente() throws Exception {
-		mvc.perform(get("/cargas/999999/canhoto")).andExpect(status().isNotFound());
-		mvc.perform(post("/cargas/999999/canhoto/registros").contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(get("/notas-fiscais/999999/canhoto")).andExpect(status().isNotFound());
+		mvc.perform(post("/notas-fiscais/999999/canhoto/registros").contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("RECEBIDO", hoje(), null, false)))
 				.andExpect(status().isNotFound());
 	}

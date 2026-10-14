@@ -8,6 +8,8 @@ import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
 
+import br.com.controlecanhotos.Cte;
+import br.com.controlecanhotos.canhoto.StatusCanhoto;
 import br.com.controlecanhotos.coleta.Coleta;
 import br.com.controlecanhotos.historico.HistoricoStatus;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
@@ -16,7 +18,9 @@ class CargaTest {
 
 	private Carga novaCarga() {
 		Coleta coleta = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 2));
-		return coleta.adicionarCarga("11111111000111", (short) 1, 1234, BigDecimal.TEN, "Campinas", "SP");
+		Carga carga = coleta.adicionarCarga(Cte.chave(1), "Campinas", "SP");
+		carga.adicionarNotaFiscal("11111111000111", (short) 1, 1234, BigDecimal.TEN);
+		return carga;
 	}
 
 	@Test
@@ -24,7 +28,8 @@ class CargaTest {
 		Carga carga = novaCarga();
 
 		assertThat(carga.getStatus()).isEqualTo(StatusCarga.AGUARDANDO_COLETA);
-		assertThat(carga.getCanhoto()).isNotNull();
+		assertThat(carga.getNotasFiscais()).singleElement()
+				.satisfies(nota -> assertThat(nota.getCanhoto().getStatus()).isEqualTo(StatusCanhoto.PENDENTE));
 		assertThat(carga.getHistorico()).hasSize(1);
 		assertThat(carga.getHistorico().getFirst().getStatusAnterior()).isNull();
 	}
@@ -87,5 +92,56 @@ class CargaTest {
 	@Test
 	void coletadaNaoVaiDiretoParaDevolvida() {
 		assertThat(StatusCarga.COLETADA.podeIrPara(StatusCarga.DEVOLVIDA)).isFalse();
+	}
+
+	@Test
+	void cteAgrupaVariasNotasCadaUmaComCanhotoPendenteEPesoSomado() {
+		Carga carga = novaCarga();
+
+		carga.adicionarNotaFiscal("11111111000111", (short) 1, 1235, new BigDecimal("5.5"));
+
+		assertThat(carga.getNotasFiscais()).hasSize(2);
+		assertThat(carga.getNotasFiscais()).allSatisfy(
+				nota -> assertThat(nota.getCanhoto().getStatus()).isEqualTo(StatusCanhoto.PENDENTE));
+		assertThat(carga.getPesoTotalKg()).isEqualByComparingTo("15.5");
+	}
+
+	@Test
+	void rejeitaMesmaNotaDuasVezesNoMesmoCte() {
+		Carga carga = novaCarga();
+
+		assertThatThrownBy(() -> carga.adicionarNotaFiscal("11111111000111", (short) 1, 1234, BigDecimal.ONE))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessageContaining("repetida no CT-e")
+				.hasMessageContaining("11111111000111/1/1234");
+		assertThat(carga.getNotasFiscais()).hasSize(1);
+	}
+
+	@Test
+	void mesmoNumeroComSerieOuEmitenteDiferenteNoMesmoCteEhOutraNota() {
+		Carga carga = novaCarga();
+
+		carga.adicionarNotaFiscal("11111111000111", (short) 2, 1234, BigDecimal.ONE);
+		carga.adicionarNotaFiscal("22222222000122", (short) 1, 1234, BigDecimal.ONE);
+
+		assertThat(carga.getNotasFiscais()).hasSize(3);
+	}
+
+	@Test
+	void mesmaNotaPodeEstarEmCtesDiferentes() {
+		Coleta coleta = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 2));
+		Carga primeira = coleta.adicionarCarga(Cte.chave(1), "Campinas", "SP");
+		Carga segunda = coleta.adicionarCarga(Cte.chave(2), "Santos", "SP");
+
+		primeira.adicionarNotaFiscal("11111111000111", (short) 1, 1234, BigDecimal.TEN);
+		segunda.adicionarNotaFiscal("11111111000111", (short) 1, 1234, BigDecimal.TEN);
+
+		assertThat(primeira.getNotasFiscais()).hasSize(1);
+		assertThat(segunda.getNotasFiscais()).hasSize(1);
+	}
+
+	@Test
+	void cteCriadoPeloSistemaNaoTemChaveProvisoria() {
+		assertThat(novaCarga().isChaveProvisoria()).isFalse();
 	}
 }
