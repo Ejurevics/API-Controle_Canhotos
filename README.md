@@ -155,7 +155,7 @@ No Swagger, use o botão **Authorize** e cole o token.
 | `OPERADOR` | Coletas, cargas e canhotos: criar, consultar, listar, alterar status e situação, registrar canhoto. Trocar a própria senha |
 | `ADMIN` | Tudo do `OPERADOR`, mais corrigir a chave de acesso provisória (`PATCH /cargas/{id}/chave-acesso`) e gerenciar usuários (`/usuarios`) |
 
-Sem token, ou com token inválido ou expirado, a resposta é `401`; com perfil sem permissão, `403`. O token vale `JWT_EXPIRACAO` (1 hora por padrão). Login inexistente, usuário inativo e senha errada respondem igual (`401`, "Login ou senha inválidos").
+Sem token, ou com token inválido, expirado ou revogado, a resposta é `401`; com perfil sem permissão, `403`. O token vale `JWT_EXPIRACAO` (1 hora por padrão). Login inexistente, usuário inativo e senha errada respondem igual (`401`, "Login ou senha inválidos").
 
 Limite de tentativas ([ADR 0003](docs/adr/0003-limite-tentativas-login.md)): 5 falhas de um mesmo login, ou 20 de um mesmo IP, em 15 minutos bloqueiam novas tentativas até a janela acabar. A resposta é `429` com `Retry-After`, e nem a senha certa entra durante o bloqueio. Login certo zera as falhas do login. Os contadores ficam em memória e zeram ao reiniciar a aplicação. Atrás de proxy ou NAT (inclusive o Docker Desktop), vários clientes podem chegar com o mesmo IP; veja o ADR.
 
@@ -171,7 +171,7 @@ curl -s -X POST http://localhost:8080/usuarios \
 - Senha: de 8 a 72 caracteres e no máximo 72 bytes em UTF-8 (limite do BCrypt). A resposta nunca traz a senha nem o hash.
 - Usuários não são apagados, só desativados: usuário inativo não entra. Ninguém desativa o próprio usuário, e o último ADMIN ativo não pode ser desativado (`422`).
 - Trocar a senha (`PATCH /auth/senha`) exige a senha atual; errada responde `422`.
-- Desativar o usuário ou trocar a senha não invalida tokens já emitidos: eles valem até expirar (risco aceito no ADR 0002).
+- Desativar o usuário ou trocar a senha (pelo próprio usuário ou pelo ADMIN) derruba na hora todos os tokens já emitidos para ele, inclusive o usado na troca: é preciso entrar de novo. Reativar não devolve os tokens antigos ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
 
 ### Listagens
 
@@ -349,4 +349,5 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Gestão de usuários pela API (criar, listar, desativar, trocar senha).
 - [x] Histórico da carga e do canhoto registra o usuário que fez cada mudança.
 - [x] Limite de tentativas de login por login e por IP ([ADR 0003](docs/adr/0003-limite-tentativas-login.md)).
+- [x] Revogar os tokens de quem é desativado ou troca a senha ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
