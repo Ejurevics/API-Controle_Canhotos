@@ -10,7 +10,7 @@ import br.com.controlecanhotos.historico.HistoricoCanhoto;
 
 public record CanhotoResponse(
 		Long id,
-		Long cargaId,
+		Long notaFiscalId,
 		StatusCanhoto status,
 		LocalDate dataRecebimento,
 		String observacao,
@@ -26,7 +26,7 @@ public record CanhotoResponse(
 	}
 
 	public static CanhotoResponse de(Canhoto canhoto) {
-		return new CanhotoResponse(canhoto.getId(), canhoto.getCarga().getId(), canhoto.getStatus(),
+		return new CanhotoResponse(canhoto.getId(), canhoto.getNotaFiscal().getId(), canhoto.getStatus(),
 				canhoto.getDataRecebimento(), canhoto.getObservacao(),
 				canhoto.getHistorico().stream().map(Registro::de).toList());
 	}

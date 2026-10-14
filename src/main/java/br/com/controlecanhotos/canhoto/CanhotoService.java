@@ -11,8 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import br.com.controlecanhotos.canhoto.dto.CanhotoResponse;
 import br.com.controlecanhotos.canhoto.dto.CanhotoResumoResponse;
 import br.com.controlecanhotos.canhoto.dto.RegistrarCanhotoRequest;
-import br.com.controlecanhotos.carga.Carga;
-import br.com.controlecanhotos.carga.CargaRepository;
+import br.com.controlecanhotos.notafiscal.NotaFiscal;
+import br.com.controlecanhotos.notafiscal.NotaFiscalRepository;
 import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
@@ -20,18 +20,18 @@ import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
 @Service
 public class CanhotoService {
 
-	private final CargaRepository cargaRepository;
+	private final NotaFiscalRepository notaFiscalRepository;
 
 	private final CanhotoRepository canhotoRepository;
 
-	public CanhotoService(CargaRepository cargaRepository, CanhotoRepository canhotoRepository) {
-		this.cargaRepository = cargaRepository;
+	public CanhotoService(NotaFiscalRepository notaFiscalRepository, CanhotoRepository canhotoRepository) {
+		this.notaFiscalRepository = notaFiscalRepository;
 		this.canhotoRepository = canhotoRepository;
 	}
 
 	@Transactional(readOnly = true)
-	public CanhotoResponse buscar(Long cargaId) {
-		return CanhotoResponse.de(obter(cargaId).getCanhoto());
+	public CanhotoResponse buscar(Long notaFiscalId) {
+		return CanhotoResponse.de(obter(notaFiscalId).getCanhoto());
 	}
 
 	@Transactional(readOnly = true)
@@ -45,15 +45,15 @@ public class CanhotoService {
 		}
 		if (clienteCnpj != null) {
 			filtro = filtro.and((root, query, cb) -> cb.equal(
-					root.get("carga").get("coleta").get("clienteCnpj"), clienteCnpj));
+					root.get("notaFiscal").get("carga").get("coleta").get("clienteCnpj"), clienteCnpj));
 		}
 		if (dataInicio != null) {
 			filtro = filtro.and((root, query, cb) -> cb.greaterThanOrEqualTo(
-					root.get("carga").get("coleta").get("dataProgramada"), dataInicio));
+					root.get("notaFiscal").get("carga").get("coleta").get("dataProgramada"), dataInicio));
 		}
 		if (dataFim != null) {
 			filtro = filtro.and((root, query, cb) -> cb.lessThanOrEqualTo(
-					root.get("carga").get("coleta").get("dataProgramada"), dataFim));
+					root.get("notaFiscal").get("carga").get("coleta").get("dataProgramada"), dataFim));
 		}
 
 		return new PagedModel<>(canhotoRepository
@@ -62,8 +62,8 @@ public class CanhotoService {
 	}
 
 	@Transactional
-	public CanhotoResponse registrar(Long cargaId, RegistrarCanhotoRequest request) {
-		Canhoto canhoto = obter(cargaId).getCanhoto();
+	public CanhotoResponse registrar(Long notaFiscalId, RegistrarCanhotoRequest request) {
+		Canhoto canhoto = obter(notaFiscalId).getCanhoto();
 		boolean confirmada = Boolean.TRUE.equals(request.dataFuturaConfirmada());
 
 		switch (request.status()) {
@@ -76,8 +76,9 @@ public class CanhotoService {
 		return CanhotoResponse.de(canhoto);
 	}
 
-	private Carga obter(Long cargaId) {
-		return cargaRepository.findById(cargaId)
-				.orElseThrow(() -> new RecursoNaoEncontradoException("Carga não encontrada: " + cargaId));
+	private NotaFiscal obter(Long notaFiscalId) {
+		return notaFiscalRepository.findById(notaFiscalId)
+				.orElseThrow(() -> new RecursoNaoEncontradoException(
+						"Nota fiscal não encontrada: " + notaFiscalId));
 	}
 }

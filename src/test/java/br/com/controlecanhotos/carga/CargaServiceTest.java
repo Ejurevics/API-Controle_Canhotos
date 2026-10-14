@@ -22,6 +22,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.canhoto.StatusCanhoto;
 import br.com.controlecanhotos.carga.dto.AlterarStatusRequest;
 import br.com.controlecanhotos.carga.dto.CargaDetalheResponse;
@@ -39,8 +40,10 @@ class CargaServiceTest {
 	private CargaService service;
 
 	private static Carga novaCarga() {
-		return new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 20))
-				.adicionarCarga("11111111000111", (short) 1, 1001, new BigDecimal("10"), "Campinas", "SP");
+		Carga carga = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 20))
+				.adicionarCarga(Cte.chave(1), "Campinas", "SP");
+		carga.adicionarNotaFiscal("11111111000111", (short) 1, 1001, new BigDecimal("10"));
+		return carga;
 	}
 
 	@Test
@@ -50,7 +53,12 @@ class CargaServiceTest {
 		CargaDetalheResponse resposta = service.buscar(1L);
 
 		assertThat(resposta.status()).isEqualTo(StatusCarga.AGUARDANDO_COLETA);
-		assertThat(resposta.statusCanhoto()).isEqualTo(StatusCanhoto.PENDENTE);
+		assertThat(resposta.chaveAcesso()).isEqualTo(Cte.chave(1));
+		assertThat(resposta.pesoTotalKg()).isEqualByComparingTo("10");
+		assertThat(resposta.notasFiscais()).singleElement().satisfies(nota -> {
+			assertThat(nota.numeroNotaFiscal()).isEqualTo(1001);
+			assertThat(nota.statusCanhoto()).isEqualTo(StatusCanhoto.PENDENTE);
+		});
 		assertThat(resposta.historico()).singleElement().satisfies(h -> {
 			assertThat(h.statusAnterior()).isNull();
 			assertThat(h.statusNovo()).isEqualTo(StatusCarga.AGUARDANDO_COLETA);
@@ -133,7 +141,10 @@ class CargaServiceTest {
 		assertThat(captor.getValue().getPageSize()).isEqualTo(5);
 		assertThat(captor.getValue().getSort().toString()).isEqualTo("id: ASC");
 		assertThat(pagina.getContent()).singleElement()
-				.satisfies(c -> assertThat(c.statusCanhoto()).isEqualTo(StatusCanhoto.PENDENTE));
+				.satisfies(c -> {
+					assertThat(c.chaveAcesso()).isEqualTo(Cte.chave(1));
+					assertThat(c.status()).isEqualTo(StatusCarga.AGUARDANDO_COLETA);
+				});
 	}
 
 	@Test

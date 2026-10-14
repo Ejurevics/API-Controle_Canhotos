@@ -10,6 +10,6 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 public interface CanhotoRepository extends JpaRepository<Canhoto, Long>, JpaSpecificationExecutor<Canhoto> {
 
 	@Override
-	@EntityGraph(attributePaths = { "carga", "carga.coleta" })
+	@EntityGraph(attributePaths = { "notaFiscal", "notaFiscal.carga", "notaFiscal.carga.coleta" })
 	Page<Canhoto> findAll(Specification<Canhoto> spec, Pageable pageable);
 }

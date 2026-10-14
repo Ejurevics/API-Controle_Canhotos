@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.jayway.jsonpath.JsonPath;
 
+import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.TestcontainersConfiguration;
 
 @SpringBootTest
@@ -32,11 +33,12 @@ class CargaControllerTest {
 	private MockMvc mvc;
 
 	private long criarCarga() throws Exception {
+		int numeroNf = NUMERO_NF.incrementAndGet();
 		String body = """
 				{"clienteNome": "Cliente B", "clienteCnpj": "33333333000133", "dataProgramada": "2026-10-20",
-				 "cargas": [{"numeroNotaFiscal": %d, "pesoKg": 10, "cidadeDestino": "Santos",
-				 "ufDestino": "SP"}]}
-				""".formatted(NUMERO_NF.incrementAndGet());
+				 "cargas": [{"chaveAcesso": "%s", "cidadeDestino": "Santos", "ufDestino": "SP",
+				 "notasFiscais": [{"numeroNotaFiscal": %d, "pesoKg": 10}]}]}
+				""".formatted(Cte.chave(numeroNf), numeroNf);
 		String resposta = mvc.perform(post("/coletas").contentType(MediaType.APPLICATION_JSON).content(body))
 				.andReturn().getResponse().getContentAsString();
 		return ((Number) JsonPath.read(resposta, "$.cargas[0].id")).longValue();
