@@ -171,6 +171,54 @@ class SegurancaTest {
 	}
 
 	@Test
+	void operadorNaoGerenciaUsuarios() throws Exception {
+		criarUsuario("operador-sem-gestao", Perfil.OPERADOR, true);
+		String token = entrar("operador-sem-gestao", "senha-forte-1");
+
+		mvc.perform(get("/usuarios").header(HttpHeaders.AUTHORIZATION, bearer(token)))
+				.andExpect(status().isForbidden());
+		mvc.perform(post("/usuarios").header(HttpHeaders.AUTHORIZATION, bearer(token))
+				.contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void usuarioTrocaAPropriaSenhaEEntraComANova() throws Exception {
+		criarUsuario("troca-senha", Perfil.OPERADOR, true);
+		String token = entrar("troca-senha", "senha-forte-1");
+
+		mvc.perform(patch("/auth/senha").header(HttpHeaders.AUTHORIZATION, bearer(token))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"senhaAtual\": \"errada\", \"novaSenha\": \"senha-nova-12\"}"))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.detail").value("Senha atual incorreta"));
+		mvc.perform(patch("/auth/senha").header(HttpHeaders.AUTHORIZATION, bearer(token))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"senhaAtual\": \"senha-forte-1\", \"novaSenha\": \"senha-nova-12\"}"))
+				.andExpect(status().isNoContent());
+
+		entrar("troca-senha", "senha-nova-12");
+	}
+
+	@Test
+	void trocarSenhaExigeToken() throws Exception {
+		mvc.perform(patch("/auth/senha").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"senhaAtual\": \"admin12345\", \"novaSenha\": \"outra-senha-1\"}"))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void adminNaoDesativaASiMesmo() throws Exception {
+		String token = entrar("admin", "admin12345");
+		long id = usuarios.findByLogin("admin").orElseThrow().getId();
+
+		mvc.perform(patch("/usuarios/{id}/ativo", id).header(HttpHeaders.AUTHORIZATION, bearer(token))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"ativo\": false}"))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.detail").value("Não é possível desativar o próprio usuário"));
+	}
+
+	@Test
 	void tokenAdulteradoExpiradoOuDeOutroEmissorResponde401() throws Exception {
 		String valido = entrar("admin", "admin12345");
 		String adulterado = valido.substring(0, valido.length() - 2) + (valido.endsWith("A") ? "BB" : "AA");

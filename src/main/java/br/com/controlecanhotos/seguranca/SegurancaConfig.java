@@ -54,6 +54,7 @@ public class SegurancaConfig {
 						.requestMatchers("/actuator/health", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
 						.permitAll()
 						.requestMatchers(HttpMethod.PATCH, "/cargas/*/chave-acesso").hasRole("ADMIN")
+						.requestMatchers("/usuarios", "/usuarios/**").hasRole("ADMIN")
 						.anyRequest().hasAnyRole("ADMIN", "OPERADOR"))
 				.oauth2ResourceServer(o -> o
 						.jwt(j -> j.jwtAuthenticationConverter(conversorDePerfil()))

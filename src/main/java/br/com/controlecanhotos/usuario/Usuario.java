@@ -16,6 +16,11 @@ import jakarta.persistence.Id;
 @Entity
 public class Usuario {
 
+	public static final int TAMANHO_MINIMO_SENHA = 8;
+
+	/** O BCrypt só considera os primeiros 72 bytes da senha (e o Spring recusa senhas maiores). */
+	public static final int TAMANHO_MAXIMO_SENHA = 72;
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -57,6 +62,15 @@ public class Usuario {
 
 	public void desativar() {
 		ativo = false;
+	}
+
+	public void ativar() {
+		ativo = true;
+	}
+
+	/** {@code senhaHash} já vem codificada (BCrypt). */
+	public void alterarSenha(String senhaHash) {
+		this.senhaHash = senhaHash;
 	}
 
 	public Long getId() {
