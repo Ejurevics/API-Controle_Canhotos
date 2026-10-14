@@ -86,6 +86,7 @@ erDiagram
 - Data de recebimento posterior à data atual (no fuso `America/Sao_Paulo`, independente do fuso do servidor) gera aviso e só é aceita com confirmação explícita, que fica marcada no histórico do canhoto.
 - O canhoto pode ser registrado mais de uma vez (ex.: `DIVERGENTE` e depois `RECEBIDO`). Cada registro fica em `historico_canhoto` com status, data e observação; o canhoto guarda só o estado atual.
 - Toda mudança de status da carga gera um registro em `historico_status`.
+- Cada registro de histórico guarda o login de quem fez a mudança (`alteradoPor` na carga, `registradoPor` no canhoto), tirado do token. Os registros iniciais ficam com quem criou a coleta. Registros gravados antes da v0.5.0 ficam com o campo nulo.
 - Cargas criadas antes do agrupamento por CT-e foram migradas com uma chave de acesso **provisória** (prefixo `99` + id, `chaveProvisoria: true`). Ela é corrigida com `PATCH /cargas/{id}/chave-acesso`, que aceita só chave válida e ainda não usada e só vale para chave provisória (a definitiva não muda); `GET /cargas?chaveProvisoria=true` lista as pendentes.
 
 ### Transições de status da carga
@@ -340,4 +341,5 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Regra para concluir uma coleta com base no status das cargas.
 - [x] Autenticação com JWT e perfis ADMIN e OPERADOR ([ADR 0002](docs/adr/0002-autenticacao-jwt.md)).
 - [x] Gestão de usuários pela API (criar, listar, desativar, trocar senha).
+- [x] Histórico da carga e do canhoto registra o usuário que fez cada mudança.
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
