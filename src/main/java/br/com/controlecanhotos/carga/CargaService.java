@@ -50,6 +50,8 @@ public class CargaService {
 	public CargaDetalheResponse alterarStatus(Long id, AlterarStatusRequest request) {
 		Carga carga = obter(id);
 		carga.alterarStatus(request.status(), request.motivo());
+		// Grava antes de montar a resposta: data e usuário do histórico novo só são preenchidos na gravação.
+		cargaRepository.flush();
 		return CargaDetalheResponse.de(carga);
 	}
 

@@ -3,12 +3,15 @@ package br.com.controlecanhotos.historico;
 import java.time.OffsetDateTime;
 
 import org.hibernate.annotations.CreationTimestamp;
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.StatusCarga;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -18,6 +21,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 
 @Entity
+@EntityListeners(AuditingEntityListener.class)
 public class HistoricoStatus {
 
 	@Id
@@ -39,6 +43,11 @@ public class HistoricoStatus {
 	private OffsetDateTime alteradoEm;
 
 	private String motivo;
+
+	/** Login de quem fez a mudança; nulo nos registros anteriores à autenticação. */
+	@CreatedBy
+	@Column(updatable = false)
+	private String alteradoPor;
 
 	protected HistoricoStatus() {
 	}
@@ -72,5 +81,9 @@ public class HistoricoStatus {
 
 	public String getMotivo() {
 		return motivo;
+	}
+
+	public String getAlteradoPor() {
+		return alteradoPor;
 	}
 }
