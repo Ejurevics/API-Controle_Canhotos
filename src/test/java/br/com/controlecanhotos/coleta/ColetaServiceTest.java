@@ -23,12 +23,14 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.carga.CargaRepository;
 import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.carga.dto.CriarCargaRequest;
 import br.com.controlecanhotos.canhoto.StatusCanhoto;
 import br.com.controlecanhotos.coleta.dto.ColetaResponse;
 import br.com.controlecanhotos.coleta.dto.CriarColetaRequest;
+import br.com.controlecanhotos.notafiscal.dto.CriarNotaFiscalRequest;
 import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 
@@ -47,8 +49,12 @@ class ColetaServiceTest {
 	@InjectMocks
 	private ColetaService service;
 
-	private static CriarCargaRequest carga(Integer numero, String emitenteCnpj, Short serie) {
-		return new CriarCargaRequest(emitenteCnpj, serie, numero, new BigDecimal("150.5"), "Campinas", "SP");
+	private static CriarNotaFiscalRequest nota(Integer numero, String emitenteCnpj, Short serie) {
+		return new CriarNotaFiscalRequest(emitenteCnpj, serie, numero, new BigDecimal("150.5"));
+	}
+
+	private static CriarCargaRequest cte(int chave, CriarNotaFiscalRequest... notas) {
+		return new CriarCargaRequest(Cte.chave(chave), "Campinas", "SP", List.of(notas));
 	}
 
 	private static CriarColetaRequest request(CriarCargaRequest... cargas) {
@@ -60,63 +66,92 @@ class ColetaServiceTest {
 	}
 
 	@Test
-	void criaColetaAplicandoEmitenteESeriePadrao() {
+	void criaColetaAplicandoEmitenteESeriePadraoNasNotas() {
 		when(coletaRepository.save(any(Coleta.class))).thenAnswer(i -> i.getArgument(0));
 
-		ColetaResponse resposta = service.criar(request(carga(1001, null, null)));
+		ColetaResponse resposta = service.criar(request(cte(1, nota(1001, null, null))));
 
 		assertThat(resposta.situacao()).isEqualTo(SituacaoColeta.PROGRAMADA);
 		assertThat(resposta.cargas()).singleElement().satisfies(c -> {
-			assertThat(c.emitenteCnpj()).isEqualTo(CNPJ_CLIENTE);
-			assertThat(c.serieNotaFiscal()).isEqualTo((short) 1);
+			assertThat(c.chaveAcesso()).isEqualTo(Cte.chave(1));
 			assertThat(c.status()).isEqualTo(StatusCarga.AGUARDANDO_COLETA);
-			assertThat(c.statusCanhoto()).isEqualTo(StatusCanhoto.PENDENTE);
+			assertThat(c.notasFiscais()).singleElement().satisfies(n -> {
+				assertThat(n.emitenteCnpj()).isEqualTo(CNPJ_CLIENTE);
+				assertThat(n.serieNotaFiscal()).isEqualTo((short) 1);
+				assertThat(n.statusCanhoto()).isEqualTo(StatusCanhoto.PENDENTE);
+			});
 		});
-		verify(cargaRepository).existsByEmitenteCnpjAndSerieNotaFiscalAndNumeroNotaFiscal(
-				CNPJ_CLIENTE, (short) 1, 1001);
+		verify(cargaRepository).existsByChaveAcesso(Cte.chave(1));
 	}
 
 	@Test
 	void criaColetaRespeitandoEmitenteESerieInformados() {
 		when(coletaRepository.save(any(Coleta.class))).thenAnswer(i -> i.getArgument(0));
 
-		ColetaResponse resposta = service.criar(request(carga(1002, CNPJ_OUTRO, (short) 3)));
+		ColetaResponse resposta = service.criar(request(cte(1, nota(1002, CNPJ_OUTRO, (short) 3))));
 
-		assertThat(resposta.cargas()).singleElement().satisfies(c -> {
-			assertThat(c.emitenteCnpj()).isEqualTo(CNPJ_OUTRO);
-			assertThat(c.serieNotaFiscal()).isEqualTo((short) 3);
+		assertThat(resposta.cargas().getFirst().notasFiscais()).singleElement().satisfies(n -> {
+			assertThat(n.emitenteCnpj()).isEqualTo(CNPJ_OUTRO);
+			assertThat(n.serieNotaFiscal()).isEqualTo((short) 3);
 		});
-		verify(cargaRepository).existsByEmitenteCnpjAndSerieNotaFiscalAndNumeroNotaFiscal(
-				CNPJ_OUTRO, (short) 3, 1002);
 	}
 
 	@Test
-	void rejeitaNotaFiscalRepetidaNaMesmaRequisicao() {
-		assertThatThrownBy(() -> service.criar(request(carga(1003, null, null), carga(1003, null, null))))
-				.isInstanceOf(RegraNegocioException.class)
-				.hasMessageContaining("repetida na requisição");
-
-		verify(coletaRepository, never()).save(any());
-	}
-
-	@Test
-	void mesmoNumeroComSerieDiferenteNaoEhRepeticao() {
+	void criaCteComVariasNotasSomandoOPeso() {
 		when(coletaRepository.save(any(Coleta.class))).thenAnswer(i -> i.getArgument(0));
 
-		ColetaResponse resposta = service.criar(
-				request(carga(1004, null, (short) 1), carga(1004, null, (short) 2)));
+		ColetaResponse resposta = service.criar(request(cte(1, nota(1001, null, null), nota(1002, null, null))));
+
+		assertThat(resposta.cargas()).singleElement().satisfies(c -> {
+			assertThat(c.notasFiscais()).hasSize(2);
+			assertThat(c.pesoTotalKg()).isEqualByComparingTo("301");
+		});
+	}
+
+	@Test
+	void mesmoNumeroDeNotaEmCtesDiferentesEhPermitido() {
+		when(coletaRepository.save(any(Coleta.class))).thenAnswer(i -> i.getArgument(0));
+
+		ColetaResponse resposta = service.criar(request(cte(1, nota(1001, null, null)), cte(2, nota(1001, null, null))));
 
 		assertThat(resposta.cargas()).hasSize(2);
 	}
 
 	@Test
-	void rejeitaNotaFiscalJaCadastrada() {
-		when(cargaRepository.existsByEmitenteCnpjAndSerieNotaFiscalAndNumeroNotaFiscal(
-				CNPJ_CLIENTE, (short) 1, 1005)).thenReturn(true);
-
-		assertThatThrownBy(() -> service.criar(request(carga(1005, null, null))))
+	void rejeitaNotaRepetidaNoMesmoCte() {
+		assertThatThrownBy(() -> service.criar(request(cte(1, nota(1003, null, null), nota(1003, null, null)))))
 				.isInstanceOf(RegraNegocioException.class)
-				.hasMessageContaining("já cadastrada");
+				.hasMessageContaining("repetida no CT-e");
+
+		verify(coletaRepository, never()).save(any());
+	}
+
+	@Test
+	void mesmoNumeroComSerieDiferenteNoMesmoCteNaoEhRepeticao() {
+		when(coletaRepository.save(any(Coleta.class))).thenAnswer(i -> i.getArgument(0));
+
+		ColetaResponse resposta = service.criar(
+				request(cte(1, nota(1004, null, (short) 1), nota(1004, null, (short) 2))));
+
+		assertThat(resposta.cargas().getFirst().notasFiscais()).hasSize(2);
+	}
+
+	@Test
+	void rejeitaCteRepetidoNaRequisicao() {
+		assertThatThrownBy(() -> service.criar(request(cte(1, nota(1001, null, null)), cte(1, nota(1002, null, null)))))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessageContaining("CT-e repetido na requisição");
+
+		verify(coletaRepository, never()).save(any());
+	}
+
+	@Test
+	void rejeitaCteJaCadastrado() {
+		when(cargaRepository.existsByChaveAcesso(Cte.chave(1))).thenReturn(true);
+
+		assertThatThrownBy(() -> service.criar(request(cte(1, nota(1005, null, null)))))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessageContaining("CT-e já cadastrado");
 
 		verify(coletaRepository, never()).save(any());
 	}

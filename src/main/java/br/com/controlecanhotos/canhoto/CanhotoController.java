@@ -12,7 +12,7 @@ import br.com.controlecanhotos.canhoto.dto.RegistrarCanhotoRequest;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/cargas/{cargaId}/canhoto")
+@RequestMapping("/notas-fiscais/{notaFiscalId}/canhoto")
 public class CanhotoController {
 
 	private final CanhotoService service;
@@ -22,12 +22,12 @@ public class CanhotoController {
 	}
 
 	@GetMapping
-	CanhotoResponse buscar(@PathVariable Long cargaId) {
-		return service.buscar(cargaId);
+	CanhotoResponse buscar(@PathVariable Long notaFiscalId) {
+		return service.buscar(notaFiscalId);
 	}
 
 	@PostMapping("/registros")
-	CanhotoResponse registrar(@PathVariable Long cargaId, @RequestBody @Valid RegistrarCanhotoRequest request) {
-		return service.registrar(cargaId, request);
+	CanhotoResponse registrar(@PathVariable Long notaFiscalId, @RequestBody @Valid RegistrarCanhotoRequest request) {
+		return service.registrar(notaFiscalId, request);
 	}
 }

@@ -11,9 +11,9 @@ import java.util.List;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.historico.HistoricoCanhoto;
+import br.com.controlecanhotos.notafiscal.NotaFiscal;
 import br.com.controlecanhotos.shared.exception.ConfirmacaoNecessariaException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import jakarta.persistence.CascadeType;
@@ -40,8 +40,8 @@ public class Canhoto {
 	private Long id;
 
 	@OneToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "carga_id")
-	private Carga carga;
+	@JoinColumn(name = "nota_fiscal_id")
+	private NotaFiscal notaFiscal;
 
 	@Enumerated(EnumType.STRING)
 	private StatusCanhoto status;
@@ -64,8 +64,8 @@ public class Canhoto {
 	protected Canhoto() {
 	}
 
-	public Canhoto(Carga carga) {
-		this.carga = carga;
+	public Canhoto(NotaFiscal notaFiscal) {
+		this.notaFiscal = notaFiscal;
 		this.status = StatusCanhoto.PENDENTE;
 		this.historico.add(new HistoricoCanhoto(this, null, status, null, null, false));
 	}
@@ -107,10 +107,10 @@ public class Canhoto {
 	}
 
 	private void exigirCargaEntregue() {
-		if (carga.getStatus() != StatusCarga.ENTREGUE) {
+		if (notaFiscal.getCarga().getStatus() != StatusCarga.ENTREGUE) {
 			throw new RegraNegocioException(
 					"Canhoto só pode ser registrado com a carga ENTREGUE (status atual: %s)"
-							.formatted(carga.getStatus()));
+							.formatted(notaFiscal.getCarga().getStatus()));
 		}
 	}
 
@@ -136,8 +136,8 @@ public class Canhoto {
 		return id;
 	}
 
-	public Carga getCarga() {
-		return carga;
+	public NotaFiscal getNotaFiscal() {
+		return notaFiscal;
 	}
 
 	public StatusCanhoto getStatus() {

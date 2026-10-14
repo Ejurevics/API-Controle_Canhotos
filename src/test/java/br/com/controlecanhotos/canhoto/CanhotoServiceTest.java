@@ -23,10 +23,12 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.canhoto.dto.CanhotoResponse;
 import br.com.controlecanhotos.canhoto.dto.RegistrarCanhotoRequest;
 import br.com.controlecanhotos.carga.Carga;
-import br.com.controlecanhotos.carga.CargaRepository;
+import br.com.controlecanhotos.notafiscal.NotaFiscal;
+import br.com.controlecanhotos.notafiscal.NotaFiscalRepository;
 import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.coleta.Coleta;
 import br.com.controlecanhotos.shared.exception.ConfirmacaoNecessariaException;
@@ -37,7 +39,7 @@ import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 class CanhotoServiceTest {
 
 	@Mock
-	private CargaRepository cargaRepository;
+	private NotaFiscalRepository notaFiscalRepository;
 
 	@Mock
 	private CanhotoRepository canhotoRepository;
@@ -50,15 +52,16 @@ class CanhotoServiceTest {
 		return LocalDate.now(ZoneId.of("America/Sao_Paulo"));
 	}
 
-	private static Carga cargaNoStatus(StatusCarga destino) {
+	private static NotaFiscal notaNoStatus(StatusCarga destino) {
 		Carga carga = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 20))
-				.adicionarCarga("11111111000111", (short) 1, 1001, new BigDecimal("10"), "Campinas", "SP");
+				.adicionarCarga(Cte.chave(1), "Campinas", "SP");
+		NotaFiscal nota = carga.adicionarNotaFiscal("11111111000111", (short) 1, 1001, new BigDecimal("10"));
 		if (destino != StatusCarga.AGUARDANDO_COLETA) {
 			carga.alterarStatus(StatusCarga.COLETADA, null);
 			carga.alterarStatus(StatusCarga.EM_TRANSITO, null);
 			carga.alterarStatus(StatusCarga.ENTREGUE, null);
 		}
-		return carga;
+		return nota;
 	}
 
 	private static RegistrarCanhotoRequest registro(StatusCanhoto status, LocalDate data, String observacao,
@@ -67,8 +70,8 @@ class CanhotoServiceTest {
 	}
 
 	@Test
-	void buscaCanhotoPendenteDaCarga() {
-		when(cargaRepository.findById(1L)).thenReturn(Optional.of(cargaNoStatus(StatusCarga.AGUARDANDO_COLETA)));
+	void buscaCanhotoPendenteDaNota() {
+		when(notaFiscalRepository.findById(1L)).thenReturn(Optional.of(notaNoStatus(StatusCarga.AGUARDANDO_COLETA)));
 
 		CanhotoResponse resposta = service.buscar(1L);
 
@@ -78,8 +81,8 @@ class CanhotoServiceTest {
 	}
 
 	@Test
-	void buscaCanhotoDeCargaInexistenteLancaNaoEncontrado() {
-		when(cargaRepository.findById(99L)).thenReturn(Optional.empty());
+	void buscaCanhotoDeNotaInexistenteLancaNaoEncontrado() {
+		when(notaFiscalRepository.findById(99L)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.buscar(99L))
 				.isInstanceOf(RecursoNaoEncontradoException.class)
@@ -88,7 +91,7 @@ class CanhotoServiceTest {
 
 	@Test
 	void registraRecebimentoComCargaEntregue() {
-		when(cargaRepository.findById(1L)).thenReturn(Optional.of(cargaNoStatus(StatusCarga.ENTREGUE)));
+		when(notaFiscalRepository.findById(1L)).thenReturn(Optional.of(notaNoStatus(StatusCarga.ENTREGUE)));
 
 		CanhotoResponse resposta = service.registrar(1L, registro(StatusCanhoto.RECEBIDO, hoje(), null, null));
 
@@ -100,7 +103,7 @@ class CanhotoServiceTest {
 
 	@Test
 	void registraDivergenciaComObservacao() {
-		when(cargaRepository.findById(1L)).thenReturn(Optional.of(cargaNoStatus(StatusCarga.ENTREGUE)));
+		when(notaFiscalRepository.findById(1L)).thenReturn(Optional.of(notaNoStatus(StatusCarga.ENTREGUE)));
 
 		CanhotoResponse resposta = service.registrar(1L,
 				registro(StatusCanhoto.DIVERGENTE, hoje(), "Assinatura ilegível", false));
@@ -111,7 +114,7 @@ class CanhotoServiceTest {
 
 	@Test
 	void divergenciaSemObservacaoEhRejeitada() {
-		when(cargaRepository.findById(1L)).thenReturn(Optional.of(cargaNoStatus(StatusCarga.ENTREGUE)));
+		when(notaFiscalRepository.findById(1L)).thenReturn(Optional.of(notaNoStatus(StatusCarga.ENTREGUE)));
 
 		assertThatThrownBy(() -> service.registrar(1L, registro(StatusCanhoto.DIVERGENTE, hoje(), " ", false)))
 				.isInstanceOf(RegraNegocioException.class)
@@ -120,7 +123,7 @@ class CanhotoServiceTest {
 
 	@Test
 	void divergenciaDepoisDeRecebimentoPreservaOHistorico() {
-		when(cargaRepository.findById(1L)).thenReturn(Optional.of(cargaNoStatus(StatusCarga.ENTREGUE)));
+		when(notaFiscalRepository.findById(1L)).thenReturn(Optional.of(notaNoStatus(StatusCarga.ENTREGUE)));
 
 		service.registrar(1L, registro(StatusCanhoto.DIVERGENTE, hoje(), "Rasurado", false));
 		CanhotoResponse resposta = service.registrar(1L, registro(StatusCanhoto.RECEBIDO, hoje(), null, false));
@@ -133,7 +136,7 @@ class CanhotoServiceTest {
 
 	@Test
 	void exigeCargaEntregue() {
-		when(cargaRepository.findById(1L)).thenReturn(Optional.of(cargaNoStatus(StatusCarga.AGUARDANDO_COLETA)));
+		when(notaFiscalRepository.findById(1L)).thenReturn(Optional.of(notaNoStatus(StatusCarga.AGUARDANDO_COLETA)));
 
 		assertThatThrownBy(() -> service.registrar(1L, registro(StatusCanhoto.RECEBIDO, hoje(), null, false)))
 				.isInstanceOf(RegraNegocioException.class)
@@ -142,7 +145,7 @@ class CanhotoServiceTest {
 
 	@Test
 	void naoPermiteRegistrarComoPendente() {
-		when(cargaRepository.findById(1L)).thenReturn(Optional.of(cargaNoStatus(StatusCarga.ENTREGUE)));
+		when(notaFiscalRepository.findById(1L)).thenReturn(Optional.of(notaNoStatus(StatusCarga.ENTREGUE)));
 
 		assertThatThrownBy(() -> service.registrar(1L, registro(StatusCanhoto.PENDENTE, hoje(), null, false)))
 				.isInstanceOf(RegraNegocioException.class)
@@ -151,13 +154,13 @@ class CanhotoServiceTest {
 
 	@Test
 	void dataFuturaPedeConfirmacaoESoPassaQuandoConfirmada() {
-		Carga carga = cargaNoStatus(StatusCarga.ENTREGUE);
-		when(cargaRepository.findById(1L)).thenReturn(Optional.of(carga));
+		NotaFiscal nota = notaNoStatus(StatusCarga.ENTREGUE);
+		when(notaFiscalRepository.findById(1L)).thenReturn(Optional.of(nota));
 		LocalDate futura = hoje().plusDays(30);
 
 		assertThatThrownBy(() -> service.registrar(1L, registro(StatusCanhoto.RECEBIDO, futura, null, null)))
 				.isInstanceOf(ConfirmacaoNecessariaException.class);
-		assertThat(carga.getCanhoto().getStatus()).isEqualTo(StatusCanhoto.PENDENTE);
+		assertThat(nota.getCanhoto().getStatus()).isEqualTo(StatusCanhoto.PENDENTE);
 
 		CanhotoResponse resposta = service.registrar(1L, registro(StatusCanhoto.RECEBIDO, futura, null, true));
 
@@ -167,7 +170,7 @@ class CanhotoServiceTest {
 
 	@Test
 	void confirmacaoComDataNaoFuturaNaoMarcaOHistorico() {
-		when(cargaRepository.findById(1L)).thenReturn(Optional.of(cargaNoStatus(StatusCarga.ENTREGUE)));
+		when(notaFiscalRepository.findById(1L)).thenReturn(Optional.of(notaNoStatus(StatusCarga.ENTREGUE)));
 
 		CanhotoResponse resposta = service.registrar(1L, registro(StatusCanhoto.RECEBIDO, hoje(), null, true));
 
@@ -175,8 +178,8 @@ class CanhotoServiceTest {
 	}
 
 	@Test
-	void registrarEmCargaInexistenteLancaNaoEncontrado() {
-		when(cargaRepository.findById(99L)).thenReturn(Optional.empty());
+	void registrarEmNotaInexistenteLancaNaoEncontrado() {
+		when(notaFiscalRepository.findById(99L)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.registrar(99L, registro(StatusCanhoto.RECEBIDO, hoje(), null, false)))
 				.isInstanceOf(RecursoNaoEncontradoException.class);
@@ -184,9 +187,9 @@ class CanhotoServiceTest {
 
 	@Test
 	void listaOrdenandoPorIdComAPaginaPedida() {
-		Carga carga = cargaNoStatus(StatusCarga.AGUARDANDO_COLETA);
+		NotaFiscal nota = notaNoStatus(StatusCarga.AGUARDANDO_COLETA);
 		when(canhotoRepository.findAll(any(Specification.class), any(Pageable.class)))
-				.thenAnswer(i -> new PageImpl<>(List.of(carga.getCanhoto()), i.getArgument(1), 1));
+				.thenAnswer(i -> new PageImpl<>(List.of(nota.getCanhoto()), i.getArgument(1), 1));
 
 		var pagina = service.listar(StatusCanhoto.PENDENTE, "11111111000111", LocalDate.of(2026, 10, 1),
 				LocalDate.of(2026, 10, 31), 0, 50);
@@ -199,6 +202,7 @@ class CanhotoServiceTest {
 			assertThat(c.status()).isEqualTo(StatusCanhoto.PENDENTE);
 			assertThat(c.clienteCnpj()).isEqualTo("11111111000111");
 			assertThat(c.numeroNotaFiscal()).isEqualTo(1001);
+			assertThat(c.chaveAcesso()).isEqualTo(Cte.chave(1));
 			assertThat(c.dataProgramada()).isEqualTo(LocalDate.of(2026, 10, 20));
 		});
 	}

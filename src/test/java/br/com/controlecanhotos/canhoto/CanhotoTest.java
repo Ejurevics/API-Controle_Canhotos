@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.Test;
 
+import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.coleta.Coleta;
@@ -31,7 +32,9 @@ class CanhotoTest {
 
 	private Carga novaCarga() {
 		Coleta coleta = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 2));
-		return coleta.adicionarCarga("11111111000111", (short) 1, 1234, BigDecimal.TEN, "Campinas", "SP");
+		Carga carga = coleta.adicionarCarga(Cte.chave(1), "Campinas", "SP");
+		carga.adicionarNotaFiscal("11111111000111", (short) 1, 1234, BigDecimal.TEN);
+		return carga;
 	}
 
 	private Canhoto novoCanhoto() {
@@ -39,12 +42,12 @@ class CanhotoTest {
 		carga.alterarStatus(StatusCarga.COLETADA, null);
 		carga.alterarStatus(StatusCarga.EM_TRANSITO, null);
 		carga.alterarStatus(StatusCarga.ENTREGUE, null);
-		return carga.getCanhoto();
+		return carga.getNotasFiscais().getFirst().getCanhoto();
 	}
 
 	@Test
 	void nascePendenteSemDataDeRecebimento() {
-		Canhoto canhoto = novaCarga().getCanhoto();
+		Canhoto canhoto = novaCarga().getNotasFiscais().getFirst().getCanhoto();
 
 		assertThat(canhoto.getStatus()).isEqualTo(StatusCanhoto.PENDENTE);
 		assertThat(canhoto.getDataRecebimento()).isNull();
@@ -54,7 +57,7 @@ class CanhotoTest {
 	void registrarRecebimentoComCargaNaoEntregueLancaExcecaoENaoMudaNada() {
 		Carga carga = novaCarga();
 		carga.alterarStatus(StatusCarga.COLETADA, null);
-		Canhoto canhoto = carga.getCanhoto();
+		Canhoto canhoto = carga.getNotasFiscais().getFirst().getCanhoto();
 
 		assertThatThrownBy(() -> canhoto.registrarRecebimento(RECEBIMENTO, false))
 				.isInstanceOf(RegraNegocioException.class)
@@ -66,7 +69,7 @@ class CanhotoTest {
 
 	@Test
 	void registrarDivergenciaComCargaNaoEntregueLancaExcecaoENaoMudaNada() {
-		Canhoto canhoto = novaCarga().getCanhoto();
+		Canhoto canhoto = novaCarga().getNotasFiscais().getFirst().getCanhoto();
 
 		assertThatThrownBy(() -> canhoto.registrarDivergencia(RECEBIMENTO, "Assinatura ilegível", false))
 				.isInstanceOf(RegraNegocioException.class)
@@ -130,7 +133,7 @@ class CanhotoTest {
 
 	@Test
 	void nasceComHistoricoInicialPendente() {
-		Canhoto canhoto = novaCarga().getCanhoto();
+		Canhoto canhoto = novaCarga().getNotasFiscais().getFirst().getCanhoto();
 
 		assertThat(canhoto.getHistorico())
 				.extracting(HistoricoCanhoto::getStatusAnterior, HistoricoCanhoto::getStatusNovo)

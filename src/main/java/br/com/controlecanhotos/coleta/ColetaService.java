@@ -10,11 +10,13 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.com.controlecanhotos.carga.Carga;
 import br.com.controlecanhotos.carga.CargaRepository;
 import br.com.controlecanhotos.carga.dto.CriarCargaRequest;
 import br.com.controlecanhotos.coleta.dto.ColetaResponse;
 import br.com.controlecanhotos.coleta.dto.ColetaResumoResponse;
 import br.com.controlecanhotos.coleta.dto.CriarColetaRequest;
+import br.com.controlecanhotos.notafiscal.dto.CriarNotaFiscalRequest;
 import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
@@ -35,23 +37,23 @@ public class ColetaService {
 	@Transactional
 	public ColetaResponse criar(CriarColetaRequest request) {
 		Coleta coleta = new Coleta(request.clienteNome(), request.clienteCnpj(), request.dataProgramada());
-		Set<String> notasDaRequisicao = new HashSet<>();
+		Set<String> chavesDaRequisicao = new HashSet<>();
 
 		for (CriarCargaRequest item : request.cargas()) {
-			String emitenteCnpj = item.emitenteCnpj() != null ? item.emitenteCnpj() : request.clienteCnpj();
-			short serie = item.serieNotaFiscal() != null ? item.serieNotaFiscal() : SERIE_PADRAO;
-			int numero = item.numeroNotaFiscal();
-			String descricaoNf = "%s/%d/%d".formatted(emitenteCnpj, serie, numero);
+			String chave = item.chaveAcesso();
+			if (!chavesDaRequisicao.add(chave)) {
+				throw new RegraNegocioException("CT-e repetido na requisição: " + chave);
+			}
+			if (cargaRepository.existsByChaveAcesso(chave)) {
+				throw new RegraNegocioException("CT-e já cadastrado: " + chave);
+			}
 
-			if (!notasDaRequisicao.add(descricaoNf)) {
-				throw new RegraNegocioException("Nota fiscal repetida na requisição: " + descricaoNf);
+			Carga carga = coleta.adicionarCarga(chave, item.cidadeDestino(), item.ufDestino());
+			for (CriarNotaFiscalRequest nota : item.notasFiscais()) {
+				String emitenteCnpj = nota.emitenteCnpj() != null ? nota.emitenteCnpj() : request.clienteCnpj();
+				short serie = nota.serieNotaFiscal() != null ? nota.serieNotaFiscal() : SERIE_PADRAO;
+				carga.adicionarNotaFiscal(emitenteCnpj, serie, nota.numeroNotaFiscal(), nota.pesoKg());
 			}
-			if (cargaRepository.existsByEmitenteCnpjAndSerieNotaFiscalAndNumeroNotaFiscal(
-					emitenteCnpj, serie, numero)) {
-				throw new RegraNegocioException("Nota fiscal já cadastrada: " + descricaoNf);
-			}
-			coleta.adicionarCarga(emitenteCnpj, serie, numero, item.pesoKg(), item.cidadeDestino(),
-					item.ufDestino());
 		}
 		return ColetaResponse.de(coletaRepository.save(coleta));
 	}

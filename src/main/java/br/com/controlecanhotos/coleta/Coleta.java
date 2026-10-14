@@ -1,11 +1,11 @@
 package br.com.controlecanhotos.coleta;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -64,10 +64,8 @@ public class Coleta {
 		this.situacao = SituacaoColeta.PROGRAMADA;
 	}
 
-	public Carga adicionarCarga(String emitenteCnpj, short serieNotaFiscal, int numeroNotaFiscal,
-			BigDecimal pesoKg, String cidadeDestino, String ufDestino) {
-		Carga carga = new Carga(this, emitenteCnpj, serieNotaFiscal, numeroNotaFiscal,
-				pesoKg, cidadeDestino, ufDestino);
+	public Carga adicionarCarga(String chaveAcesso, String cidadeDestino, String ufDestino) {
+		Carga carga = new Carga(this, chaveAcesso, cidadeDestino, ufDestino);
 		cargas.add(carga);
 		return carga;
 	}
@@ -77,7 +75,22 @@ public class Coleta {
 			throw new RegraNegocioException(
 					"Transição de situação inválida: %s -> %s".formatted(situacao, novaSituacao));
 		}
+		if (novaSituacao == SituacaoColeta.CONCLUIDA) {
+			exigirCargasFinalizadas();
+		}
 		situacao = novaSituacao;
+	}
+
+	private void exigirCargasFinalizadas() {
+		String pendentes = cargas.stream()
+				.filter(carga -> !carga.getStatus().finalizada())
+				.map(carga -> "%s (%s)".formatted(carga.getChaveAcesso(), carga.getStatus()))
+				.collect(Collectors.joining(", "));
+		if (!pendentes.isEmpty()) {
+			throw new RegraNegocioException(
+					"Coleta só pode ser concluída com todas as cargas ENTREGUE ou DEVOLVIDA; pendentes (CT-e): "
+							+ pendentes);
+		}
 	}
 
 	public Long getId() {

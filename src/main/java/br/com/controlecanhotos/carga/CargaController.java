@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import br.com.controlecanhotos.carga.dto.AlterarStatusRequest;
 import br.com.controlecanhotos.carga.dto.CargaDetalheResponse;
-import br.com.controlecanhotos.carga.dto.CargaResponse;
+import br.com.controlecanhotos.carga.dto.CargaResumoResponse;
 import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
 import jakarta.validation.Valid;
 
@@ -26,7 +26,7 @@ public class CargaController {
 	}
 
 	@GetMapping
-	PagedModel<CargaResponse> listar(
+	PagedModel<CargaResumoResponse> listar(
 			@RequestParam(required = false) StatusCarga status,
 			@RequestParam(required = false) Long coletaId,
 			@RequestParam(defaultValue = "0") int pagina,

@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.com.controlecanhotos.carga.dto.AlterarStatusRequest;
 import br.com.controlecanhotos.carga.dto.CargaDetalheResponse;
-import br.com.controlecanhotos.carga.dto.CargaResponse;
+import br.com.controlecanhotos.carga.dto.CargaResumoResponse;
 import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
 import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
 
@@ -27,7 +27,7 @@ public class CargaService {
 	}
 
 	@Transactional(readOnly = true)
-	public PagedModel<CargaResponse> listar(StatusCarga status, Long coletaId, int pagina, int tamanho) {
+	public PagedModel<CargaResumoResponse> listar(StatusCarga status, Long coletaId, int pagina, int tamanho) {
 		Specification<Carga> filtro = (root, query, cb) -> cb.conjunction();
 		if (status != null) {
 			filtro = filtro.and((root, query, cb) -> cb.equal(root.get("status"), status));
@@ -38,7 +38,7 @@ public class CargaService {
 
 		return new PagedModel<>(cargaRepository
 				.findAll(filtro, ParametrosListagem.paginar(pagina, tamanho, Sort.by("id")))
-				.map(CargaResponse::de));
+				.map(CargaResumoResponse::de));
 	}
 
 	@Transactional

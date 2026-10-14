@@ -22,6 +22,10 @@ public enum StatusCarga {
 		};
 	}
 
+	public boolean finalizada() {
+		return this == ENTREGUE || this == DEVOLVIDA;
+	}
+
 	public boolean podeIrPara(StatusCarga novo) {
 		return proximosPermitidos().contains(novo);
 	}

@@ -34,8 +34,9 @@ class ListagensControllerTest {
 				cargas.append(",");
 			}
 			cargas.append("""
-					{"numeroNotaFiscal": %d, "pesoKg": 10, "cidadeDestino": "Campinas", "ufDestino": "SP"}
-					""".formatted(numero));
+					{"chaveAcesso": "%s", "cidadeDestino": "Campinas", "ufDestino": "SP",
+					 "notasFiscais": [{"numeroNotaFiscal": %d, "pesoKg": 10}]}
+					""".formatted(Cte.chave(numero), numero));
 		}
 		String body = """
 				{"clienteNome": "Cliente", "clienteCnpj": "%s", "dataProgramada": "%s", "cargas": [%s]}
@@ -62,7 +63,10 @@ class ListagensControllerTest {
 		alterarStatusCarga(cargaId, "COLETADA");
 		alterarStatusCarga(cargaId, "EM_TRANSITO");
 		alterarStatusCarga(cargaId, "ENTREGUE");
-		mvc.perform(post("/cargas/" + cargaId + "/canhoto/registros").contentType(MediaType.APPLICATION_JSON)
+		String carga = mvc.perform(get("/cargas/" + cargaId)).andReturn().getResponse().getContentAsString();
+		long notaFiscalId = ((Number) JsonPath.read(carga, "$.notasFiscais[0].id")).longValue();
+		mvc.perform(post("/notas-fiscais/" + notaFiscalId + "/canhoto/registros")
+				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"status\": \"RECEBIDO\", \"dataRecebimento\": \"2026-01-01\"}"))
 				.andExpect(status().isOk());
 	}
@@ -150,7 +154,9 @@ class ListagensControllerTest {
 		mvc.perform(get("/cargas").param("coletaId", coleta.toString()).param("status", "COLETADA"))
 				.andExpect(jsonPath("$.page.totalElements").value(1))
 				.andExpect(jsonPath("$.content[0].id").value(cargaId))
-				.andExpect(jsonPath("$.content[0].statusCanhoto").value("PENDENTE"));
+				.andExpect(jsonPath("$.content[0].chaveAcesso").value(Cte.chave(20031)))
+				.andExpect(jsonPath("$.content[0].quantidadeNotasFiscais").value(1))
+				.andExpect(jsonPath("$.content[0].canhotosPendentes").value(1));
 
 		mvc.perform(get("/cargas").param("coletaId", coleta.toString()).param("status", "AGUARDANDO_COLETA"))
 				.andExpect(jsonPath("$.page.totalElements").value(2));
@@ -178,9 +184,53 @@ class ListagensControllerTest {
 				.param("dataInicio", "2026-11-15").param("dataFim", "2026-12-31"))
 				.andExpect(jsonPath("$.page.totalElements").value(1))
 				.andExpect(jsonPath("$.content[0].numeroNotaFiscal").value(20043))
+				.andExpect(jsonPath("$.content[0].chaveAcesso").value(Cte.chave(20043)))
 				.andExpect(jsonPath("$.content[0].dataProgramada").value("2026-12-01"));
 
 		mvc.perform(get("/canhotos").param("clienteCnpj", cnpj))
 				.andExpect(jsonPath("$.page.totalElements").value(3));
+	}
+
+	@Test
+	void cteComVariasNotasTemUmCanhotoPorNotaECadaUmSeguePorConta() throws Exception {
+		String cnpj = "30000000000006";
+		String body = """
+				{"clienteNome": "Cliente", "clienteCnpj": "%s", "dataProgramada": "2026-11-01",
+				 "cargas": [{"chaveAcesso": "%s", "cidadeDestino": "Campinas", "ufDestino": "SP",
+				 "notasFiscais": [{"numeroNotaFiscal": 20051, "pesoKg": 10},
+				                  {"numeroNotaFiscal": 20052, "pesoKg": 20},
+				                  {"numeroNotaFiscal": 20053, "pesoKg": 30}]}]}
+				""".formatted(cnpj, Cte.chave(20050));
+		String coleta = mvc.perform(post("/coletas").contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		long cargaId = ((Number) JsonPath.read(coleta, "$.cargas[0].id")).longValue();
+		long primeiraNota = ((Number) JsonPath.read(coleta, "$.cargas[0].notasFiscais[0].id")).longValue();
+		alterarStatusCarga(cargaId, "COLETADA");
+		alterarStatusCarga(cargaId, "EM_TRANSITO");
+		alterarStatusCarga(cargaId, "ENTREGUE");
+		mvc.perform(post("/notas-fiscais/" + primeiraNota + "/canhoto/registros")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"status\": \"DIVERGENTE\", \"dataRecebimento\": \"2026-01-01\", "
+						+ "\"observacao\": \"Rasurado\"}"))
+				.andExpect(status().isOk());
+
+		mvc.perform(get("/canhotos").param("clienteCnpj", cnpj))
+				.andExpect(jsonPath("$.page.totalElements").value(3))
+				.andExpect(jsonPath("$.content[0].status").value("DIVERGENTE"))
+				.andExpect(jsonPath("$.content[0].numeroNotaFiscal").value(20051))
+				.andExpect(jsonPath("$.content[1].status").value("PENDENTE"))
+				.andExpect(jsonPath("$.content[2].status").value("PENDENTE"))
+				.andExpect(jsonPath("$.content[*].cargaId").value(org.hamcrest.Matchers.everyItem(
+						org.hamcrest.Matchers.is((int) cargaId))));
+
+		mvc.perform(get("/cargas").param("coletaId", String.valueOf(
+				((Number) JsonPath.read(coleta, "$.id")).longValue())))
+				.andExpect(jsonPath("$.content[0].quantidadeNotasFiscais").value(3))
+				.andExpect(jsonPath("$.content[0].canhotosPendentes").value(2));
+
+		mvc.perform(get("/cargas/" + cargaId))
+				.andExpect(jsonPath("$.pesoTotalKg").value(60))
+				.andExpect(jsonPath("$.notasFiscais.length()").value(3));
 	}
 }
