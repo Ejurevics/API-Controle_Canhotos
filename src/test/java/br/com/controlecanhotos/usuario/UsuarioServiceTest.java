@@ -94,7 +94,9 @@ class UsuarioServiceTest {
 		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(operador));
 
 		assertThat(service.alterarAtivo(1L, false, "admin").ativo()).isFalse();
+		assertThat(operador.getVersaoCredencial()).as("desativar derruba os tokens").isEqualTo(1);
 		assertThat(service.alterarAtivo(1L, true, "admin").ativo()).isTrue();
+		assertThat(operador.getVersaoCredencial()).as("reativar não devolve os tokens").isEqualTo(1);
 	}
 
 	@Test
@@ -138,6 +140,7 @@ class UsuarioServiceTest {
 		service.redefinirSenha(1L, "nova-senha-1");
 
 		assertThat(operador.getSenhaHash()).isEqualTo("hash-novo");
+		assertThat(operador.getVersaoCredencial()).isEqualTo(1);
 	}
 
 	@Test

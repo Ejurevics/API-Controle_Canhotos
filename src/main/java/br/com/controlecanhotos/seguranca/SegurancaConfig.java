@@ -15,7 +15,10 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
@@ -36,6 +39,7 @@ public class SegurancaConfig {
 
 	public static final String EMISSOR = "controle-canhotos";
 	public static final String CLAIM_PERFIL = "perfil";
+	public static final String CLAIM_VERSAO_CREDENCIAL = "ver";
 
 	private static final int TAMANHO_MINIMO_SEGREDO = 32;
 
@@ -85,9 +89,14 @@ public class SegurancaConfig {
 	}
 
 	@Bean
-	JwtDecoder jwtDecoder(SecretKey chaveJwt) {
+	JwtDecoder jwtDecoder(SecretKey chaveJwt, ValidadorCredencialAtual credencialAtual) {
 		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(chaveJwt).macAlgorithm(MacAlgorithm.HS256).build();
-		decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(EMISSOR));
+		OAuth2TokenValidator<Jwt> padrao = JwtValidators.createDefaultWithIssuer(EMISSOR);
+		// Só consulta o banco se o token já passou nas validações de data e emissor.
+		decoder.setJwtValidator(jwt -> {
+			OAuth2TokenValidatorResult resultado = padrao.validate(jwt);
+			return resultado.hasErrors() ? resultado : credencialAtual.validate(jwt);
+		});
 		return decoder;
 	}
 
