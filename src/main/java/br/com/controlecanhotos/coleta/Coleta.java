@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -77,7 +78,22 @@ public class Coleta {
 			throw new RegraNegocioException(
 					"Transição de situação inválida: %s -> %s".formatted(situacao, novaSituacao));
 		}
+		if (novaSituacao == SituacaoColeta.CONCLUIDA) {
+			exigirCargasFinalizadas();
+		}
 		situacao = novaSituacao;
+	}
+
+	private void exigirCargasFinalizadas() {
+		String pendentes = cargas.stream()
+				.filter(carga -> !carga.getStatus().finalizada())
+				.map(carga -> "%d (%s)".formatted(carga.getNumeroNotaFiscal(), carga.getStatus()))
+				.collect(Collectors.joining(", "));
+		if (!pendentes.isEmpty()) {
+			throw new RegraNegocioException(
+					"Coleta só pode ser concluída com todas as cargas ENTREGUE ou DEVOLVIDA; pendentes (NF): "
+							+ pendentes);
+		}
 	}
 
 	public Long getId() {

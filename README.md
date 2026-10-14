@@ -98,6 +98,8 @@ Registrar `OCORRENCIA` exige motivo.
 | `EM_ANDAMENTO` | `CONCLUIDA`, `CANCELADA` |
 | `CONCLUIDA`, `CANCELADA` | — (finais) |
 
+Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. Caso contrário, responde `422` listando as notas pendentes e seus status (ex.: `1002 (EM_TRANSITO)`). O status do canhoto não é considerado. Cancelar não tem essa exigência.
+
 ## Endpoints
 
 | Método | Rota | Descrição |
@@ -257,6 +259,6 @@ docker-compose.yml App + PostgreSQL com healthcheck
 
 - [x] Listagens com filtros e paginação (coletas por situação, cliente e período; cargas por status; canhotos pendentes).
 - [x] Testes de service.
-- [ ] Regra para concluir uma coleta com base no status das cargas.
+- [x] Regra para concluir uma coleta com base no status das cargas.
 - [ ] Autenticação.
 - [ ] Agrupar NFs por CT-e (uma carga com várias NFs).

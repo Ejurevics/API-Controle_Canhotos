@@ -15,6 +15,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.jayway.jsonpath.JsonPath;
+
 import br.com.controlecanhotos.TestcontainersConfiguration;
 
 @SpringBootTest
@@ -121,6 +123,16 @@ class ColetaControllerTest {
 		return "{\"situacao\": \"%s\"}".formatted(situacao);
 	}
 
+	private void entregarPrimeiraCarga(String locationColeta) throws Exception {
+		String coleta = mvc.perform(get(locationColeta)).andReturn().getResponse().getContentAsString();
+		Number idCarga = JsonPath.read(coleta, "$.cargas[0].id");
+		for (String status : new String[] { "COLETADA", "EM_TRANSITO", "ENTREGUE" }) {
+			mvc.perform(patch("/cargas/{id}/status", idCarga).contentType(MediaType.APPLICATION_JSON)
+					.content("{\"status\": \"%s\"}".formatted(status)))
+					.andExpect(status().isOk());
+		}
+	}
+
 	@Test
 	void alteraSituacaoSeguindoOFluxo() throws Exception {
 		String location = criarColeta(1101);
@@ -130,12 +142,29 @@ class ColetaControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.situacao").value("EM_ANDAMENTO"));
 
+		entregarPrimeiraCarga(location);
+
 		mvc.perform(patch(location + "/situacao").contentType(MediaType.APPLICATION_JSON)
 				.content(situacao("CONCLUIDA")))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.situacao").value("CONCLUIDA"));
 
 		mvc.perform(get(location)).andExpect(jsonPath("$.situacao").value("CONCLUIDA"));
+	}
+
+	@Test
+	void naoConcluiColetaComCargaPendente() throws Exception {
+		String location = criarColeta(1105);
+		mvc.perform(patch(location + "/situacao").contentType(MediaType.APPLICATION_JSON)
+				.content(situacao("EM_ANDAMENTO"))).andExpect(status().isOk());
+
+		mvc.perform(patch(location + "/situacao").contentType(MediaType.APPLICATION_JSON)
+				.content(situacao("CONCLUIDA")))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.detail").value(
+						org.hamcrest.Matchers.containsString("1105 (AGUARDANDO_COLETA)")));
+
+		mvc.perform(get(location)).andExpect(jsonPath("$.situacao").value("EM_ANDAMENTO"));
 	}
 
 	@Test
