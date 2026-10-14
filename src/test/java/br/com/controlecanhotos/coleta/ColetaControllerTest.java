@@ -160,6 +160,33 @@ class ColetaControllerTest {
 	}
 
 	@Test
+	void rejeitaChaveComDigitoVerificadorErradoOuDeOutroModelo() throws Exception {
+		String valida = Cte.chave(1230);
+		int digito = valida.charAt(43) - '0';
+		String digitoErrado = valida.substring(0, 43) + (digito + 1) % 10;
+		String nfe = valida.substring(0, 20) + "55" + valida.substring(22);
+
+		mvc.perform(post("/coletas").contentType(MediaType.APPLICATION_JSON)
+				.content(coleta(cteComChave(digitoErrado))))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.erros['cargas[0].chaveAcesso']").value(
+						org.hamcrest.Matchers.containsString("dígito verificador inválido")));
+
+		mvc.perform(post("/coletas").contentType(MediaType.APPLICATION_JSON)
+				.content(coleta(cteComChave(nfe))))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.erros['cargas[0].chaveAcesso']").value(
+						org.hamcrest.Matchers.containsString("não é de CT-e")));
+	}
+
+	private static String cteComChave(String chave) {
+		return """
+				{"chaveAcesso": "%s", "cidadeDestino": "Campinas", "ufDestino": "SP",
+				 "notasFiscais": [{"numeroNotaFiscal": 1, "pesoKg": 10}]}
+				""".formatted(chave);
+	}
+
+	@Test
 	void rejeitaDadosInvalidos() throws Exception {
 		mvc.perform(post("/coletas").contentType(MediaType.APPLICATION_JSON)
 				.content("""

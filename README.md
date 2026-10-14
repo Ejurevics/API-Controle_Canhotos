@@ -78,7 +78,7 @@ erDiagram
     }
 ```
 
-- Cada carga corresponde a **um CT-e**, identificado pela chave de acesso de 44 dígitos (única no sistema), e agrupa **de 1 a N notas fiscais**. O status e o histórico de status são do CT-e; o peso total é a soma das NFs.
+- Cada carga corresponde a **um CT-e**, identificado pela chave de acesso de 44 dígitos (única no sistema e validada: modelo `57` nas posições 21 e 22 e dígito verificador em módulo 11), e agrupa **de 1 a N notas fiscais**. O status e o histórico de status são do CT-e; o peso total é a soma das NFs.
 - A NF é identificada por CNPJ do emitente + série + número, **única só dentro do CT-e**: o mesmo número pode se repetir em CT-es diferentes, porque a numeração segue a de cada cliente.
 - Se não informados, o CNPJ do emitente da NF assume o do cliente da coleta e a série assume `1`.
 - Cada NF tem o seu canhoto, que nasce `PENDENTE` junto com ela. `RECEBIDO` e `DIVERGENTE` exigem data de recebimento; `DIVERGENTE` exige observação.
@@ -109,7 +109,7 @@ Registrar `OCORRENCIA` exige motivo.
 | `EM_ANDAMENTO` | `CONCLUIDA`, `CANCELADA` |
 | `CONCLUIDA`, `CANCELADA` | — (finais) |
 
-Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. Caso contrário, responde `422` listando os CT-es pendentes (chave de acesso) e seus status (ex.: `35261011111111000111570010000012341000012345 (EM_TRANSITO)`). O status do canhoto não é considerado. Cancelar não tem essa exigência.
+Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. Caso contrário, responde `422` listando os CT-es pendentes (chave de acesso) e seus status (ex.: `35261011111111000111570010000012341000012343 (EM_TRANSITO)`). O status do canhoto não é considerado. Cancelar não tem essa exigência.
 
 ## Endpoints
 
@@ -163,7 +163,7 @@ Exemplo de `POST /coletas` com um CT-e de duas NFs (`emitenteCnpj` e `serieNotaF
   "dataProgramada": "2026-10-20",
   "cargas": [
     {
-      "chaveAcesso": "35261011111111000111570010000012341000012345",
+      "chaveAcesso": "35261011111111000111570010000012341000012343",
       "cidadeDestino": "Campinas",
       "ufDestino": "SP",
       "notasFiscais": [
