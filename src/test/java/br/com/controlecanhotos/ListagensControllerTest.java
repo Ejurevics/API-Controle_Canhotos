@@ -21,7 +21,7 @@ import com.jayway.jsonpath.JsonPath;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({ TestcontainersConfiguration.class, AutenticadoComoAdmin.class })
 class ListagensControllerTest {
 
 	@Autowired

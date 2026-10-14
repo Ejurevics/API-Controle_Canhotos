@@ -17,12 +17,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.jayway.jsonpath.JsonPath;
 
+import br.com.controlecanhotos.AutenticadoComoAdmin;
 import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.TestcontainersConfiguration;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({ TestcontainersConfiguration.class, AutenticadoComoAdmin.class })
 class ColetaControllerTest {
 
 	private static final String CNPJ_CLIENTE = "11111111000111";

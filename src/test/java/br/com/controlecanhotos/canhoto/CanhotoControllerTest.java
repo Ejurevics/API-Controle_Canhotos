@@ -21,12 +21,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.jayway.jsonpath.JsonPath;
 
+import br.com.controlecanhotos.AutenticadoComoAdmin;
 import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.TestcontainersConfiguration;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({ TestcontainersConfiguration.class, AutenticadoComoAdmin.class })
 class CanhotoControllerTest {
 
 	private static final AtomicInteger NUMERO_NF = new AtomicInteger(3000);
