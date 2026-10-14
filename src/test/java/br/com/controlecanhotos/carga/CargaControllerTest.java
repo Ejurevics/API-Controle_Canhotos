@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.jayway.jsonpath.JsonPath;
@@ -31,6 +32,9 @@ class CargaControllerTest {
 
 	@Autowired
 	private MockMvc mvc;
+
+	@Autowired
+	private JdbcTemplate jdbc;
 
 	private long criarCarga() throws Exception {
 		int numeroNf = NUMERO_NF.incrementAndGet();
@@ -102,6 +106,65 @@ class CargaControllerTest {
 		mvc.perform(patch("/cargas/{id}/status", id).contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("VOANDO", null)))
 				.andExpect(status().isBadRequest());
+	}
+
+	/** Deixa a carga como uma migrada pela V3: chave provisória com prefixo 99. */
+	private void tornarProvisoria(long id) {
+		jdbc.update("UPDATE carga SET chave_acesso = ?, chave_provisoria = TRUE WHERE id = ?",
+				"99" + "%042d".formatted(id), id);
+	}
+
+	private static String chave(String chave) {
+		return "{\"chaveAcesso\": \"%s\"}".formatted(chave);
+	}
+
+	@Test
+	void listaECorrigeChaveProvisoria() throws Exception {
+		long id = criarCarga();
+		tornarProvisoria(id);
+
+		mvc.perform(get("/cargas").param("chaveProvisoria", "true").param("tamanho", "100"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content[*].id").value(org.hamcrest.Matchers.hasItem((int) id)));
+
+		mvc.perform(patch("/cargas/{id}/chave-acesso", id).contentType(MediaType.APPLICATION_JSON)
+				.content(chave(Cte.chave(2901))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.chaveAcesso").value(Cte.chave(2901)))
+				.andExpect(jsonPath("$.chaveProvisoria").value(false));
+
+		mvc.perform(get("/cargas").param("chaveProvisoria", "true").param("tamanho", "100"))
+				.andExpect(jsonPath("$.content[*].id").value(
+						org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem((int) id))));
+
+		mvc.perform(patch("/cargas/{id}/chave-acesso", id).contentType(MediaType.APPLICATION_JSON)
+				.content(chave(Cte.chave(2902))))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.detail").value(containsString("já é definitiva")));
+	}
+
+	@Test
+	void naoCorrigeParaChaveJaUsadaNemInvalida() throws Exception {
+		long outra = criarCarga();
+		String chaveEmUso = ((String) JsonPath.read(
+				mvc.perform(get("/cargas/{id}", outra)).andReturn().getResponse().getContentAsString(),
+				"$.chaveAcesso"));
+		long id = criarCarga();
+		tornarProvisoria(id);
+
+		mvc.perform(patch("/cargas/{id}/chave-acesso", id).contentType(MediaType.APPLICATION_JSON)
+				.content(chave(chaveEmUso)))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.detail").value(containsString("CT-e já cadastrado")));
+
+		String digitoErrado = Cte.chave(2903).substring(0, 43)
+				+ (Cte.chave(2903).charAt(43) - '0' + 1) % 10;
+		mvc.perform(patch("/cargas/{id}/chave-acesso", id).contentType(MediaType.APPLICATION_JSON)
+				.content(chave(digitoErrado)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.erros.chaveAcesso").value(containsString("dígito verificador")));
+
+		mvc.perform(get("/cargas/{id}", id)).andExpect(jsonPath("$.chaveProvisoria").value(true));
 	}
 
 	@Test

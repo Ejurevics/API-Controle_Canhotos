@@ -10,6 +10,7 @@ import br.com.controlecanhotos.carga.dto.AlterarStatusRequest;
 import br.com.controlecanhotos.carga.dto.CargaDetalheResponse;
 import br.com.controlecanhotos.carga.dto.CargaResumoResponse;
 import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
+import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
 
 @Service
@@ -27,13 +28,17 @@ public class CargaService {
 	}
 
 	@Transactional(readOnly = true)
-	public PagedModel<CargaResumoResponse> listar(StatusCarga status, Long coletaId, int pagina, int tamanho) {
+	public PagedModel<CargaResumoResponse> listar(StatusCarga status, Long coletaId, Boolean chaveProvisoria,
+			int pagina, int tamanho) {
 		Specification<Carga> filtro = (root, query, cb) -> cb.conjunction();
 		if (status != null) {
 			filtro = filtro.and((root, query, cb) -> cb.equal(root.get("status"), status));
 		}
 		if (coletaId != null) {
 			filtro = filtro.and((root, query, cb) -> cb.equal(root.get("coleta").get("id"), coletaId));
+		}
+		if (chaveProvisoria != null) {
+			filtro = filtro.and((root, query, cb) -> cb.equal(root.get("chaveProvisoria"), chaveProvisoria));
 		}
 
 		return new PagedModel<>(cargaRepository
@@ -45,6 +50,16 @@ public class CargaService {
 	public CargaDetalheResponse alterarStatus(Long id, AlterarStatusRequest request) {
 		Carga carga = obter(id);
 		carga.alterarStatus(request.status(), request.motivo());
+		return CargaDetalheResponse.de(carga);
+	}
+
+	@Transactional
+	public CargaDetalheResponse corrigirChaveAcesso(Long id, String novaChave) {
+		Carga carga = obter(id);
+		if (carga.isChaveProvisoria() && cargaRepository.existsByChaveAcesso(novaChave)) {
+			throw new RegraNegocioException("CT-e já cadastrado: " + novaChave);
+		}
+		carga.corrigirChaveAcesso(novaChave);
 		return CargaDetalheResponse.de(carga);
 	}
 

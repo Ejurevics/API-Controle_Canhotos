@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import br.com.controlecanhotos.carga.dto.AlterarStatusRequest;
 import br.com.controlecanhotos.carga.dto.CargaDetalheResponse;
 import br.com.controlecanhotos.carga.dto.CargaResumoResponse;
+import br.com.controlecanhotos.carga.dto.CorrigirChaveAcessoRequest;
 import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
 import jakarta.validation.Valid;
 
@@ -29,9 +30,10 @@ public class CargaController {
 	PagedModel<CargaResumoResponse> listar(
 			@RequestParam(required = false) StatusCarga status,
 			@RequestParam(required = false) Long coletaId,
+			@RequestParam(required = false) Boolean chaveProvisoria,
 			@RequestParam(defaultValue = "0") int pagina,
 			@RequestParam(defaultValue = "" + ParametrosListagem.TAMANHO_PADRAO) int tamanho) {
-		return service.listar(status, coletaId, pagina, tamanho);
+		return service.listar(status, coletaId, chaveProvisoria, pagina, tamanho);
 	}
 
 	@GetMapping("/{id}")
@@ -42,5 +44,11 @@ public class CargaController {
 	@PatchMapping("/{id}/status")
 	CargaDetalheResponse alterarStatus(@PathVariable Long id, @RequestBody @Valid AlterarStatusRequest request) {
 		return service.alterarStatus(id, request);
+	}
+
+	@PatchMapping("/{id}/chave-acesso")
+	CargaDetalheResponse corrigirChaveAcesso(@PathVariable Long id,
+			@RequestBody @Valid CorrigirChaveAcessoRequest request) {
+		return service.corrigirChaveAcesso(id, request.chaveAcesso());
 	}
 }

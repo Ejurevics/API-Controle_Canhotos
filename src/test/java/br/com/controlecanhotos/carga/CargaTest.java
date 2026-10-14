@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.canhoto.StatusCanhoto;
@@ -143,5 +144,33 @@ class CargaTest {
 	@Test
 	void cteCriadoPeloSistemaNaoTemChaveProvisoria() {
 		assertThat(novaCarga().isChaveProvisoria()).isFalse();
+	}
+
+	/** Simula uma carga migrada pela V3, que é o único jeito de existir chave provisória. */
+	static Carga cargaMigrada() {
+		Carga carga = new Coleta("Cliente A", "11111111000111", LocalDate.of(2026, 10, 2))
+				.adicionarCarga("99" + "0".repeat(41) + "1", "Campinas", "SP");
+		ReflectionTestUtils.setField(carga, "chaveProvisoria", true);
+		return carga;
+	}
+
+	@Test
+	void corrigeChaveProvisoriaQueViraDefinitiva() {
+		Carga carga = cargaMigrada();
+
+		carga.corrigirChaveAcesso(Cte.chave(7));
+
+		assertThat(carga.getChaveAcesso()).isEqualTo(Cte.chave(7));
+		assertThat(carga.isChaveProvisoria()).isFalse();
+	}
+
+	@Test
+	void naoCorrigeChaveDefinitiva() {
+		Carga carga = novaCarga();
+
+		assertThatThrownBy(() -> carga.corrigirChaveAcesso(Cte.chave(7)))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessageContaining("já é definitiva");
+		assertThat(carga.getChaveAcesso()).isEqualTo(Cte.chave(1));
 	}
 }
