@@ -1,7 +1,10 @@
 package br.com.controlecanhotos.coleta;
 
 import java.net.URI;
+import java.time.LocalDate;
 
+import org.springframework.data.web.PagedModel;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -9,11 +12,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.com.controlecanhotos.coleta.dto.AlterarSituacaoRequest;
 import br.com.controlecanhotos.coleta.dto.ColetaResponse;
+import br.com.controlecanhotos.coleta.dto.ColetaResumoResponse;
 import br.com.controlecanhotos.coleta.dto.CriarColetaRequest;
+import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
 import jakarta.validation.Valid;
 
 @RestController
@@ -30,6 +36,17 @@ public class ColetaController {
 	ResponseEntity<ColetaResponse> criar(@RequestBody @Valid CriarColetaRequest request) {
 		ColetaResponse coleta = service.criar(request);
 		return ResponseEntity.created(URI.create("/coletas/" + coleta.id())).body(coleta);
+	}
+
+	@GetMapping
+	PagedModel<ColetaResumoResponse> listar(
+			@RequestParam(required = false) SituacaoColeta situacao,
+			@RequestParam(required = false) String clienteCnpj,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim,
+			@RequestParam(defaultValue = "0") int pagina,
+			@RequestParam(defaultValue = "" + ParametrosListagem.TAMANHO_PADRAO) int tamanho) {
+		return service.listar(situacao, clienteCnpj, dataInicio, dataFim, pagina, tamanho);
 	}
 
 	@GetMapping("/{id}")

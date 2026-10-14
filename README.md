@@ -103,12 +103,35 @@ Registrar `OCORRENCIA` exige motivo.
 | Método | Rota | Descrição |
 |---|---|---|
 | `POST` | `/coletas` | Cria uma coleta com suas cargas (`201` + `Location`) |
+| `GET` | `/coletas` | Lista coletas com filtros e paginação |
 | `GET` | `/coletas/{id}` | Busca a coleta com suas cargas |
 | `PATCH` | `/coletas/{id}/situacao` | Altera a situação da coleta (`{"situacao": "..."}`) |
+| `GET` | `/cargas` | Lista cargas com filtros e paginação |
 | `GET` | `/cargas/{id}` | Busca a carga com o histórico de status |
 | `PATCH` | `/cargas/{id}/status` | Altera o status da carga (`{"status": "...", "motivo": "..."}`); `motivo` é obrigatório para `OCORRENCIA` |
+| `GET` | `/canhotos` | Lista canhotos (ex.: pendentes por cliente ou período) com paginação |
 | `GET` | `/cargas/{id}/canhoto` | Busca o canhoto com o histórico de registros |
 | `POST` | `/cargas/{id}/canhoto/registros` | Registra o canhoto como `RECEBIDO` ou `DIVERGENTE` |
+
+### Listagens
+
+Todos os filtros são opcionais e combinados com `E`. Datas no formato `AAAA-MM-DD`.
+
+| Rota | Filtros |
+|---|---|
+| `GET /coletas` | `situacao`, `clienteCnpj`, `dataInicio`, `dataFim` (sobre a data programada) |
+| `GET /cargas` | `status`, `coletaId` |
+| `GET /canhotos` | `status`, `clienteCnpj`, `dataInicio`, `dataFim` (sobre a data programada da coleta) |
+
+Paginação: `pagina` (começa em `0`, padrão `0`) e `tamanho` (padrão `20`, máximo `100`). A ordenação é fixa: coletas pela data programada (mais recente primeiro), cargas e canhotos por `id`. A resposta traz `content` e `page` (`size`, `number`, `totalElements`, `totalPages`).
+
+Exemplo, canhotos pendentes de um cliente em novembro:
+
+```
+GET /canhotos?status=PENDENTE&clienteCnpj=11111111000111&dataInicio=2026-11-01&dataFim=2026-11-30
+```
+
+Filtro com valor inválido (`situacao=XYZ`, data malformada) responde `400`; período invertido e `pagina`/`tamanho` fora do limite respondem `422`.
 
 Registro do canhoto (`observacao` obrigatória na `DIVERGENTE`; `dataFuturaConfirmada` opcional, padrão `false`):
 
@@ -213,7 +236,7 @@ src/main/java/br/com/controlecanhotos/
 ├── carga/         Carga, status, regras de transição e DTOs
 ├── canhoto/       Canhoto, status, service, controller e DTOs
 ├── historico/     Histórico de status da carga e de registros do canhoto
-└── shared/        Exceções e tratamento global de erros (ApiExceptionHandler)
+└── shared/        Exceções, tratamento global de erros (ApiExceptionHandler) e paginação
 src/main/resources/
 ├── application.yml
 └── db/migration/  Migrations Flyway (V1__, V2__...)
