@@ -64,11 +64,14 @@ class CargaControllerTest {
 				.andExpect(jsonPath("$.status").value("COLETADA"))
 				.andExpect(jsonPath("$.historico.length()").value(2))
 				.andExpect(jsonPath("$.historico[1].statusAnterior").value("AGUARDANDO_COLETA"))
-				.andExpect(jsonPath("$.historico[1].statusNovo").value("COLETADA"));
+				.andExpect(jsonPath("$.historico[1].statusNovo").value("COLETADA"))
+				.andExpect(jsonPath("$.historico[1].alteradoEm").exists())
+				.andExpect(jsonPath("$.historico[1].alteradoPor").value(AutenticadoComoAdmin.LOGIN));
 
 		mvc.perform(get("/cargas/{id}", id))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.status").value("COLETADA"));
+				.andExpect(jsonPath("$.status").value("COLETADA"))
+				.andExpect(jsonPath("$.historico[0].alteradoPor").value(AutenticadoComoAdmin.LOGIN));
 	}
 
 	@Test

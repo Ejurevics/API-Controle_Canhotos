@@ -22,10 +22,11 @@ public record CargaDetalheResponse(
 		List<Historico> historico) {
 
 	public record Historico(StatusCarga statusAnterior, StatusCarga statusNovo,
-			OffsetDateTime alteradoEm, String motivo) {
+			OffsetDateTime alteradoEm, String motivo, String alteradoPor) {
 
 		static Historico de(HistoricoStatus h) {
-			return new Historico(h.getStatusAnterior(), h.getStatusNovo(), h.getAlteradoEm(), h.getMotivo());
+			return new Historico(h.getStatusAnterior(), h.getStatusNovo(), h.getAlteradoEm(), h.getMotivo(),
+					h.getAlteradoPor());
 		}
 	}
 

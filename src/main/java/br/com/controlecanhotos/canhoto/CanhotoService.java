@@ -73,6 +73,8 @@ public class CanhotoService {
 			default -> throw new RegraNegocioException(
 					"Só é possível registrar o canhoto como RECEBIDO ou DIVERGENTE");
 		}
+		// Grava antes de montar a resposta: data e usuário do histórico novo só são preenchidos na gravação.
+		canhotoRepository.flush();
 		return CanhotoResponse.de(canhoto);
 	}
 

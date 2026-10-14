@@ -76,7 +76,9 @@ class CanhotoControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("RECEBIDO"))
 				.andExpect(jsonPath("$.dataRecebimento").value(hoje().toString()))
-				.andExpect(jsonPath("$.historico.length()").value(2));
+				.andExpect(jsonPath("$.historico.length()").value(2))
+				.andExpect(jsonPath("$.historico[1].registradoEm").exists())
+				.andExpect(jsonPath("$.historico[1].registradoPor").value(AutenticadoComoAdmin.LOGIN));
 
 		mvc.perform(get("/notas-fiscais/{id}/canhoto", id))
 				.andExpect(status().isOk())
