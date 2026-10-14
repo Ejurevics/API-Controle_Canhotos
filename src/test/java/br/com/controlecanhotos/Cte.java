@@ -3,6 +3,7 @@ package br.com.controlecanhotos;
 import java.math.BigDecimal;
 
 import br.com.controlecanhotos.carga.Carga;
+import br.com.controlecanhotos.carga.ChaveAcessoCte;
 import br.com.controlecanhotos.coleta.Coleta;
 
 /** Atalhos para montar CT-es nos testes. */
@@ -13,9 +14,14 @@ public final class Cte {
 	private Cte() {
 	}
 
-	/** Chave de acesso de 44 dígitos derivada de um número, para os testes ficarem legíveis. */
+	/**
+	 * Chave de acesso de CT-e válida derivada de um número (usado como número do CT-e), para os testes
+	 * ficarem legíveis: UF 35, emissão 10/2026, emitente {@link #CNPJ_PADRAO}, modelo 57, série 1.
+	 */
 	public static String chave(int numero) {
-		return "%044d".formatted(numero);
+		String base = "35" + "2610" + CNPJ_PADRAO + ChaveAcessoCte.MODELO_CTE + "001" + "%09d".formatted(numero)
+				+ "1" + "%08d".formatted(numero);
+		return base + ChaveAcessoCte.digitoVerificador(base);
 	}
 
 	/** CT-e com uma única NF de mesmo número, emitente padrão e série 1. */
