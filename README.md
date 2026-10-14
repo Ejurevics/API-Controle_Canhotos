@@ -86,7 +86,7 @@ erDiagram
 - Data de recebimento posterior à data atual (no fuso `America/Sao_Paulo`, independente do fuso do servidor) gera aviso e só é aceita com confirmação explícita, que fica marcada no histórico do canhoto.
 - O canhoto pode ser registrado mais de uma vez (ex.: `DIVERGENTE` e depois `RECEBIDO`). Cada registro fica em `historico_canhoto` com status, data e observação; o canhoto guarda só o estado atual.
 - Toda mudança de status da carga gera um registro em `historico_status`.
-- Cargas criadas antes do agrupamento por CT-e foram migradas com uma chave de acesso **provisória** (prefixo `99` + id, `chaveProvisoria: true`), para ser corrigida depois.
+- Cargas criadas antes do agrupamento por CT-e foram migradas com uma chave de acesso **provisória** (prefixo `99` + id, `chaveProvisoria: true`). Ela é corrigida com `PATCH /cargas/{id}/chave-acesso`, que aceita só chave válida e ainda não usada e só vale para chave provisória (a definitiva não muda); `GET /cargas?chaveProvisoria=true` lista as pendentes.
 
 ### Transições de status da carga
 
@@ -122,6 +122,7 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 | `GET` | `/cargas` | Lista cargas (CT-es) com filtros e paginação |
 | `GET` | `/cargas/{id}` | Busca a carga com as NFs e o histórico de status |
 | `PATCH` | `/cargas/{id}/status` | Altera o status da carga (`{"status": "...", "motivo": "..."}`); `motivo` é obrigatório para `OCORRENCIA` |
+| `PATCH` | `/cargas/{id}/chave-acesso` | Corrige a chave de acesso provisória de uma carga migrada (`{"chaveAcesso": "..."}`); a chave passa a ser definitiva |
 | `GET` | `/canhotos` | Lista canhotos, um por NF (ex.: pendentes por cliente ou período), com paginação |
 | `GET` | `/notas-fiscais/{id}/canhoto` | Busca o canhoto da NF com o histórico de registros |
 | `POST` | `/notas-fiscais/{id}/canhoto/registros` | Registra o canhoto da NF como `RECEBIDO` ou `DIVERGENTE` |
@@ -133,7 +134,7 @@ Todos os filtros são opcionais e combinados com `E`. Datas no formato `AAAA-MM-
 | Rota | Filtros |
 |---|---|
 | `GET /coletas` | `situacao`, `clienteCnpj`, `dataInicio`, `dataFim` (sobre a data programada) |
-| `GET /cargas` | `status`, `coletaId` |
+| `GET /cargas` | `status`, `coletaId`, `chaveProvisoria` (`true` lista as cargas que ainda precisam de correção) |
 | `GET /canhotos` | `status`, `clienteCnpj`, `dataInicio`, `dataFim` (sobre a data programada da coleta) |
 
 Paginação: `pagina` (começa em `0`, padrão `0`) e `tamanho` (padrão `20`, máximo `100`). A ordenação é fixa: coletas pela data programada (mais recente primeiro), cargas e canhotos por `id`. A resposta traz `content` e `page` (`size`, `number`, `totalElements`, `totalPages`). Na listagem de cargas, cada item traz `quantidadeNotasFiscais` e `canhotosPendentes` em vez das NFs; use `GET /cargas/{id}` para o detalhe.
