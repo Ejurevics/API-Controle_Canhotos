@@ -126,6 +126,13 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 | `GET` | `/canhotos` | Lista canhotos, um por NF (ex.: pendentes por cliente ou período), com paginação |
 | `GET` | `/notas-fiscais/{id}/canhoto` | Busca o canhoto da NF com o histórico de registros |
 | `POST` | `/notas-fiscais/{id}/canhoto/registros` | Registra o canhoto da NF como `RECEBIDO` ou `DIVERGENTE` |
+| `POST` | `/auth/login` | Entra com login e senha e recebe o token JWT (rota pública) |
+| `PATCH` | `/auth/senha` | O usuário logado troca a própria senha (`{"senhaAtual": "...", "novaSenha": "..."}`, `204`) |
+| `POST` | `/usuarios` | Cria um usuário (`{"login", "nome", "senha", "perfil"}`, `201` + `Location`). Só ADMIN |
+| `GET` | `/usuarios` | Lista usuários com filtros e paginação. Só ADMIN |
+| `GET` | `/usuarios/{id}` | Busca um usuário. Só ADMIN |
+| `PATCH` | `/usuarios/{id}/ativo` | Desativa ou reativa um usuário (`{"ativo": false}`). Só ADMIN |
+| `PATCH` | `/usuarios/{id}/senha` | Define uma nova senha para o usuário (`{"novaSenha": "..."}`, `204`). Só ADMIN |
 
 ### Autenticação
 
@@ -144,10 +151,24 @@ No Swagger, use o botão **Authorize** e cole o token.
 
 | Perfil | Pode |
 |---|---|
-| `OPERADOR` | Coletas, cargas e canhotos: criar, consultar, listar, alterar status e situação, registrar canhoto |
-| `ADMIN` | Tudo do `OPERADOR`, mais corrigir a chave de acesso provisória (`PATCH /cargas/{id}/chave-acesso`) |
+| `OPERADOR` | Coletas, cargas e canhotos: criar, consultar, listar, alterar status e situação, registrar canhoto. Trocar a própria senha |
+| `ADMIN` | Tudo do `OPERADOR`, mais corrigir a chave de acesso provisória (`PATCH /cargas/{id}/chave-acesso`) e gerenciar usuários (`/usuarios`) |
 
 Sem token, ou com token inválido ou expirado, a resposta é `401`; com perfil sem permissão, `403`. O token vale `JWT_EXPIRACAO` (1 hora por padrão). Login inexistente, usuário inativo e senha errada respondem igual (`401`, "Login ou senha inválidos").
+
+#### Gestão de usuários
+
+```bash
+curl -s -X POST http://localhost:8080/usuarios \
+  -H 'Authorization: Bearer eyJ...' -H 'Content-Type: application/json' \
+  -d '{"login": "maria.silva", "nome": "Maria Silva", "senha": "<senha>", "perfil": "OPERADOR"}'
+```
+
+- Login: de 3 a 50 caracteres (letras, números, `.`, `-` e `_`), guardado em minúsculas e sem espaços nas pontas; repetido responde `422`.
+- Senha: de 8 a 72 caracteres e no máximo 72 bytes em UTF-8 (limite do BCrypt). A resposta nunca traz a senha nem o hash.
+- Usuários não são apagados, só desativados: usuário inativo não entra. Ninguém desativa o próprio usuário, e o último ADMIN ativo não pode ser desativado (`422`).
+- Trocar a senha (`PATCH /auth/senha`) exige a senha atual; errada responde `422`.
+- Desativar o usuário ou trocar a senha não invalida tokens já emitidos: eles valem até expirar (risco aceito no ADR 0002).
 
 ### Listagens
 
@@ -158,8 +179,9 @@ Todos os filtros são opcionais e combinados com `E`. Datas no formato `AAAA-MM-
 | `GET /coletas` | `situacao`, `clienteCnpj`, `dataInicio`, `dataFim` (sobre a data programada) |
 | `GET /cargas` | `status`, `coletaId`, `chaveProvisoria` (`true` lista as cargas que ainda precisam de correção) |
 | `GET /canhotos` | `status`, `clienteCnpj`, `dataInicio`, `dataFim` (sobre a data programada da coleta) |
+| `GET /usuarios` | `perfil`, `ativo` |
 
-Paginação: `pagina` (começa em `0`, padrão `0`) e `tamanho` (padrão `20`, máximo `100`). A ordenação é fixa: coletas pela data programada (mais recente primeiro), cargas e canhotos por `id`. A resposta traz `content` e `page` (`size`, `number`, `totalElements`, `totalPages`). Na listagem de cargas, cada item traz `quantidadeNotasFiscais` e `canhotosPendentes` em vez das NFs; use `GET /cargas/{id}` para o detalhe.
+Paginação: `pagina` (começa em `0`, padrão `0`) e `tamanho` (padrão `20`, máximo `100`). A ordenação é fixa: coletas pela data programada (mais recente primeiro), cargas e canhotos por `id`, usuários por `login`. A resposta traz `content` e `page` (`size`, `number`, `totalElements`, `totalPages`). Na listagem de cargas, cada item traz `quantidadeNotasFiscais` e `canhotosPendentes` em vez das NFs; use `GET /cargas/{id}` para o detalhe.
 
 Exemplo, canhotos pendentes de um cliente em novembro:
 
@@ -291,7 +313,7 @@ src/main/java/br/com/controlecanhotos/
 ├── notafiscal/    Nota fiscal (de 1 a N por CT-e) e DTOs
 ├── canhoto/       Canhoto (um por NF), status, service, controllers e DTOs
 ├── historico/     Histórico de status da carga e de registros do canhoto
-├── usuario/       Usuário e perfil (ADMIN, OPERADOR)
+├── usuario/       Usuário, perfil (ADMIN, OPERADOR) e gestão de usuários
 ├── seguranca/     Login, emissão e validação do JWT, regras de acesso e ADMIN inicial
 └── shared/        Exceções, tratamento global de erros (ApiExceptionHandler) e paginação
 src/main/resources/
@@ -317,5 +339,5 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Testes de service.
 - [x] Regra para concluir uma coleta com base no status das cargas.
 - [x] Autenticação com JWT e perfis ADMIN e OPERADOR ([ADR 0002](docs/adr/0002-autenticacao-jwt.md)).
-- [ ] Gestão de usuários pela API (criar, listar, desativar, trocar senha).
+- [x] Gestão de usuários pela API (criar, listar, desativar, trocar senha).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).

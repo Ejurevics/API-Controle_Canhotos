@@ -41,3 +41,12 @@ Rotas públicas: `POST /auth/login`, `/actuator/health` e a documentação (`/sw
 
 1. Este ADR e o núcleo da autenticação: usuário, admin inicial, login, proteção das rotas e perfis.
 2. Gestão de usuários pelo ADMIN (criar, listar, desativar, trocar senha).
+
+### Regras da gestão de usuários (entrega 2)
+
+- `/usuarios` é só do ADMIN: criar, listar (filtros `perfil` e `ativo`), buscar, desativar ou reativar (`PATCH /usuarios/{id}/ativo`) e definir nova senha (`PATCH /usuarios/{id}/senha`).
+- Qualquer usuário logado troca a própria senha em `PATCH /auth/senha`, informando a atual. O ADMIN inicial usa isso para sair da senha do `.env`.
+- Usuários não são apagados, só desativados, para não perder a referência de quem existiu.
+- Ninguém desativa o próprio usuário, e o último ADMIN ativo não pode ser desativado: sem ele ninguém mais gerencia usuários, e o ADMIN inicial só é recriado quando não existe ADMIN nenhum.
+- Senha de 8 a 72 caracteres e no máximo 72 bytes em UTF-8, o limite do BCrypt.
+- Trocar o perfil de um usuário fica de fora por enquanto (não estava no escopo).
