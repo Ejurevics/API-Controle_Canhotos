@@ -234,9 +234,17 @@ class ColetaControllerTest {
 		mvc.perform(patch(location + "/situacao").contentType(MediaType.APPLICATION_JSON)
 				.content(situacao("CONCLUIDA")))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.situacao").value("CONCLUIDA"));
+				.andExpect(jsonPath("$.situacao").value("CONCLUIDA"))
+				.andExpect(jsonPath("$.historico.length()").value(3))
+				.andExpect(jsonPath("$.historico[2].situacaoAnterior").value("EM_ANDAMENTO"))
+				.andExpect(jsonPath("$.historico[2].situacaoNova").value("CONCLUIDA"))
+				.andExpect(jsonPath("$.historico[2].alteradoEm").exists())
+				.andExpect(jsonPath("$.historico[2].alteradoPor").value(AutenticadoComoAdmin.LOGIN));
 
-		mvc.perform(get(location)).andExpect(jsonPath("$.situacao").value("CONCLUIDA"));
+		mvc.perform(get(location))
+				.andExpect(jsonPath("$.situacao").value("CONCLUIDA"))
+				.andExpect(jsonPath("$.historico[0].situacaoNova").value("PROGRAMADA"))
+				.andExpect(jsonPath("$.historico[0].alteradoPor").value(AutenticadoComoAdmin.LOGIN));
 	}
 
 	@Test

@@ -157,18 +157,22 @@ class CargaTest {
 	@Test
 	void corrigeChaveProvisoriaQueViraDefinitiva() {
 		Carga carga = cargaMigrada();
+		String provisoria = carga.getChaveAcesso();
 
-		carga.corrigirChaveAcesso(Cte.chave(7));
+		carga.corrigirChaveAcesso(Cte.chave(7), "admin");
 
 		assertThat(carga.getChaveAcesso()).isEqualTo(Cte.chave(7));
 		assertThat(carga.isChaveProvisoria()).isFalse();
+		assertThat(carga.getChaveProvisoriaAnterior()).isEqualTo(provisoria);
+		assertThat(carga.getChaveCorrigidaPor()).isEqualTo("admin");
+		assertThat(carga.getChaveCorrigidaEm()).isNotNull();
 	}
 
 	@Test
 	void naoCorrigeChaveDefinitiva() {
 		Carga carga = novaCarga();
 
-		assertThatThrownBy(() -> carga.corrigirChaveAcesso(Cte.chave(7)))
+		assertThatThrownBy(() -> carga.corrigirChaveAcesso(Cte.chave(7), "admin"))
 				.isInstanceOf(RegraNegocioException.class)
 				.hasMessageContaining("já é definitiva");
 		assertThat(carga.getChaveAcesso()).isEqualTo(Cte.chave(1));

@@ -1,6 +1,8 @@
 package br.com.controlecanhotos.carga;
 
 import org.springframework.data.web.PagedModel;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,7 +50,7 @@ public class CargaController {
 
 	@PatchMapping("/{id}/chave-acesso")
 	CargaDetalheResponse corrigirChaveAcesso(@PathVariable Long id,
-			@RequestBody @Valid CorrigirChaveAcessoRequest request) {
-		return service.corrigirChaveAcesso(id, request.chaveAcesso());
+			@RequestBody @Valid CorrigirChaveAcessoRequest request, @AuthenticationPrincipal Jwt jwt) {
+		return service.corrigirChaveAcesso(id, request.chaveAcesso(), jwt.getSubject());
 	}
 }

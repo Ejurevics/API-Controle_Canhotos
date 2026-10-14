@@ -95,6 +95,8 @@ public class ColetaService {
 		Coleta coleta = coletaRepository.findById(id)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Coleta não encontrada: " + id));
 		coleta.alterarSituacao(novaSituacao);
+		// Grava antes de montar a resposta: data e usuário do histórico novo só são preenchidos na gravação.
+		coletaRepository.flush();
 		return ColetaResponse.de(coleta);
 	}
 }
