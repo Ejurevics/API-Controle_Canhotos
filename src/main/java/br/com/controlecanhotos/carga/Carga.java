@@ -50,6 +50,15 @@ public class Carga {
 
 	private boolean chaveProvisoria;
 
+	/** Preenchidos só na correção da chave provisória, que acontece uma vez. */
+	@JdbcTypeCode(SqlTypes.CHAR)
+	@Column(length = 44)
+	private String chaveProvisoriaAnterior;
+
+	private OffsetDateTime chaveCorrigidaEm;
+
+	private String chaveCorrigidaPor;
+
 	private String cidadeDestino;
 
 	@JdbcTypeCode(SqlTypes.CHAR)
@@ -120,13 +129,19 @@ public class Carga {
 		status = novoStatus;
 	}
 
-	/** Troca a chave provisória (de cargas migradas antes do CT-e) pela chave real, que passa a ser definitiva. */
-	public void corrigirChaveAcesso(String novaChave) {
+	/**
+	 * Troca a chave provisória (de cargas migradas antes do CT-e) pela chave real, que passa a ser definitiva.
+	 * Guarda a chave anterior, quando e por quem ({@code corrigidaPor} é o login).
+	 */
+	public void corrigirChaveAcesso(String novaChave, String corrigidaPor) {
 		if (!chaveProvisoria) {
 			throw new RegraNegocioException(
 					"Só a chave de acesso provisória pode ser corrigida; a do CT-e %s já é definitiva"
 							.formatted(chaveAcesso));
 		}
+		chaveProvisoriaAnterior = chaveAcesso;
+		chaveCorrigidaEm = OffsetDateTime.now();
+		chaveCorrigidaPor = corrigidaPor;
 		chaveAcesso = novaChave;
 		chaveProvisoria = false;
 	}
@@ -149,6 +164,18 @@ public class Carga {
 
 	public boolean isChaveProvisoria() {
 		return chaveProvisoria;
+	}
+
+	public String getChaveProvisoriaAnterior() {
+		return chaveProvisoriaAnterior;
+	}
+
+	public OffsetDateTime getChaveCorrigidaEm() {
+		return chaveCorrigidaEm;
+	}
+
+	public String getChaveCorrigidaPor() {
+		return chaveCorrigidaPor;
 	}
 
 	public String getCidadeDestino() {

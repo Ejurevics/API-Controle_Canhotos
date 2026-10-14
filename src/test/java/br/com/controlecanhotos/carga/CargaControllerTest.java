@@ -135,7 +135,13 @@ class CargaControllerTest {
 				.content(chave(Cte.chave(2901))))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.chaveAcesso").value(Cte.chave(2901)))
-				.andExpect(jsonPath("$.chaveProvisoria").value(false));
+				.andExpect(jsonPath("$.chaveProvisoria").value(false))
+				.andExpect(jsonPath("$.correcaoChave.chaveAnterior").value(org.hamcrest.Matchers.startsWith("99")))
+				.andExpect(jsonPath("$.correcaoChave.corrigidaPor").value(AutenticadoComoAdmin.LOGIN));
+
+		mvc.perform(get("/cargas/{id}", id))
+				.andExpect(jsonPath("$.correcaoChave.corrigidaEm").exists())
+				.andExpect(jsonPath("$.correcaoChave.corrigidaPor").value(AutenticadoComoAdmin.LOGIN));
 
 		mvc.perform(get("/cargas").param("chaveProvisoria", "true").param("tamanho", "100"))
 				.andExpect(jsonPath("$.content[*].id").value(

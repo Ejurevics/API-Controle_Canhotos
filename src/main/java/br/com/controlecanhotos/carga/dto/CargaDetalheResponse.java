@@ -19,7 +19,18 @@ public record CargaDetalheResponse(
 		StatusCarga status,
 		BigDecimal pesoTotalKg,
 		List<NotaFiscalResponse> notasFiscais,
-		List<Historico> historico) {
+		List<Historico> historico,
+		CorrecaoChave correcaoChave) {
+
+	/** Correção da chave provisória; nula se a chave nunca foi provisória ou ainda não foi corrigida. */
+	public record CorrecaoChave(String chaveAnterior, OffsetDateTime corrigidaEm, String corrigidaPor) {
+
+		static CorrecaoChave de(Carga carga) {
+			return carga.getChaveCorrigidaEm() == null ? null
+					: new CorrecaoChave(carga.getChaveProvisoriaAnterior(), carga.getChaveCorrigidaEm(),
+							carga.getChaveCorrigidaPor());
+		}
+	}
 
 	public record Historico(StatusCarga statusAnterior, StatusCarga statusNovo,
 			OffsetDateTime alteradoEm, String motivo, String alteradoPor) {
@@ -34,6 +45,6 @@ public record CargaDetalheResponse(
 		return new CargaDetalheResponse(carga.getId(), carga.getColeta().getId(), carga.getChaveAcesso(),
 				carga.isChaveProvisoria(), carga.getCidadeDestino(), carga.getUfDestino(), carga.getStatus(),
 				carga.getPesoTotalKg(), carga.getNotasFiscais().stream().map(NotaFiscalResponse::de).toList(),
-				carga.getHistorico().stream().map(Historico::de).toList());
+				carga.getHistorico().stream().map(Historico::de).toList(), CorrecaoChave.de(carga));
 	}
 }

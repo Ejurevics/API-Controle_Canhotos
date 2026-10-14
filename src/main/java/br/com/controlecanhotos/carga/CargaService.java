@@ -56,12 +56,12 @@ public class CargaService {
 	}
 
 	@Transactional
-	public CargaDetalheResponse corrigirChaveAcesso(Long id, String novaChave) {
+	public CargaDetalheResponse corrigirChaveAcesso(Long id, String novaChave, String loginDoSolicitante) {
 		Carga carga = obter(id);
 		if (carga.isChaveProvisoria() && cargaRepository.existsByChaveAcesso(novaChave)) {
 			throw new RegraNegocioException("CT-e já cadastrado: " + novaChave);
 		}
-		carga.corrigirChaveAcesso(novaChave);
+		carga.corrigirChaveAcesso(novaChave, loginDoSolicitante);
 		return CargaDetalheResponse.de(carga);
 	}
 

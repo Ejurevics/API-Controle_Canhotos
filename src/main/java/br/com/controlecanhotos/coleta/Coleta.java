@@ -13,6 +13,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
 import br.com.controlecanhotos.carga.Carga;
+import br.com.controlecanhotos.historico.HistoricoSituacaoColeta;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -47,6 +48,10 @@ public class Coleta {
 	@OrderBy("id")
 	private List<Carga> cargas = new ArrayList<>();
 
+	@OneToMany(mappedBy = "coleta", cascade = CascadeType.ALL)
+	@OrderBy("alteradoEm, id")
+	private List<HistoricoSituacaoColeta> historico = new ArrayList<>();
+
 	@CreationTimestamp
 	@Column(updatable = false)
 	private OffsetDateTime criadoEm;
@@ -62,6 +67,7 @@ public class Coleta {
 		this.clienteCnpj = clienteCnpj;
 		this.dataProgramada = dataProgramada;
 		this.situacao = SituacaoColeta.PROGRAMADA;
+		this.historico.add(new HistoricoSituacaoColeta(this, null, situacao));
 	}
 
 	public Carga adicionarCarga(String chaveAcesso, String cidadeDestino, String ufDestino) {
@@ -78,6 +84,7 @@ public class Coleta {
 		if (novaSituacao == SituacaoColeta.CONCLUIDA) {
 			exigirCargasFinalizadas();
 		}
+		historico.add(new HistoricoSituacaoColeta(this, situacao, novaSituacao));
 		situacao = novaSituacao;
 	}
 
@@ -115,6 +122,10 @@ public class Coleta {
 
 	public List<Carga> getCargas() {
 		return Collections.unmodifiableList(cargas);
+	}
+
+	public List<HistoricoSituacaoColeta> getHistorico() {
+		return Collections.unmodifiableList(historico);
 	}
 
 	public OffsetDateTime getCriadoEm() {
