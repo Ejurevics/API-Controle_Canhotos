@@ -2,7 +2,7 @@
 
 API REST para controle de coletas, cargas e devolução de canhotos (comprovantes de entrega assinados) em uma transportadora, com histórico de status por carga.
 
-> Projeto em construção.
+**Versão atual: `v0.2.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas. Autenticação e agrupamento por CT-e ainda não existem; veja o [Roadmap](#roadmap).
 
 ## Modelo de domínio
 
@@ -103,12 +103,35 @@ Registrar `OCORRENCIA` exige motivo.
 | Método | Rota | Descrição |
 |---|---|---|
 | `POST` | `/coletas` | Cria uma coleta com suas cargas (`201` + `Location`) |
+| `GET` | `/coletas` | Lista coletas com filtros e paginação |
 | `GET` | `/coletas/{id}` | Busca a coleta com suas cargas |
 | `PATCH` | `/coletas/{id}/situacao` | Altera a situação da coleta (`{"situacao": "..."}`) |
+| `GET` | `/cargas` | Lista cargas com filtros e paginação |
 | `GET` | `/cargas/{id}` | Busca a carga com o histórico de status |
 | `PATCH` | `/cargas/{id}/status` | Altera o status da carga (`{"status": "...", "motivo": "..."}`); `motivo` é obrigatório para `OCORRENCIA` |
+| `GET` | `/canhotos` | Lista canhotos (ex.: pendentes por cliente ou período) com paginação |
 | `GET` | `/cargas/{id}/canhoto` | Busca o canhoto com o histórico de registros |
 | `POST` | `/cargas/{id}/canhoto/registros` | Registra o canhoto como `RECEBIDO` ou `DIVERGENTE` |
+
+### Listagens
+
+Todos os filtros são opcionais e combinados com `E`. Datas no formato `AAAA-MM-DD`.
+
+| Rota | Filtros |
+|---|---|
+| `GET /coletas` | `situacao`, `clienteCnpj`, `dataInicio`, `dataFim` (sobre a data programada) |
+| `GET /cargas` | `status`, `coletaId` |
+| `GET /canhotos` | `status`, `clienteCnpj`, `dataInicio`, `dataFim` (sobre a data programada da coleta) |
+
+Paginação: `pagina` (começa em `0`, padrão `0`) e `tamanho` (padrão `20`, máximo `100`). A ordenação é fixa: coletas pela data programada (mais recente primeiro), cargas e canhotos por `id`. A resposta traz `content` e `page` (`size`, `number`, `totalElements`, `totalPages`).
+
+Exemplo, canhotos pendentes de um cliente em novembro:
+
+```
+GET /canhotos?status=PENDENTE&clienteCnpj=11111111000111&dataInicio=2026-11-01&dataFim=2026-11-30
+```
+
+Filtro com valor inválido (`situacao=XYZ`, data malformada) responde `400`; período invertido e `pagina`/`tamanho` fora do limite respondem `422`.
 
 Registro do canhoto (`observacao` obrigatória na `DIVERGENTE`; `dataFuturaConfirmada` opcional, padrão `false`):
 
@@ -213,7 +236,7 @@ src/main/java/br/com/controlecanhotos/
 ├── carga/         Carga, status, regras de transição e DTOs
 ├── canhoto/       Canhoto, status, service, controller e DTOs
 ├── historico/     Histórico de status da carga e de registros do canhoto
-└── shared/        Exceções e tratamento global de erros (ApiExceptionHandler)
+└── shared/        Exceções, tratamento global de erros (ApiExceptionHandler) e paginação
 src/main/resources/
 ├── application.yml
 └── db/migration/  Migrations Flyway (V1__, V2__...)
@@ -221,3 +244,19 @@ src/main/resources/
 Dockerfile         Build multi-stage (JDK para compilar, JRE para rodar)
 docker-compose.yml App + PostgreSQL com healthcheck
 ```
+
+## Fluxo de desenvolvimento
+
+- `main`: versões estáveis, marcadas com tag (`v0.2.0`). Só recebe a `develop` via PR de release, com merge commit.
+- `develop`: integração. Recebe os PRs de feature, com squash.
+- Branches de trabalho nascem da `develop` (`feat/`, `fix/`, `chore/`, `docs/`, `refactor/`) e são apagadas após o merge.
+- Commits seguem Conventional Commits (`feat(coleta): adiciona ...`).
+- Todo PR roda o CI (`./mvnw -B clean verify`). Mudanças que alteram uso, setup ou estrutura atualizam este README no mesmo PR.
+
+## Roadmap
+
+- [x] Listagens com filtros e paginação (coletas por situação, cliente e período; cargas por status; canhotos pendentes).
+- [x] Testes de service.
+- [ ] Regra para concluir uma coleta com base no status das cargas.
+- [ ] Autenticação.
+- [ ] Agrupar NFs por CT-e (uma carga com várias NFs).

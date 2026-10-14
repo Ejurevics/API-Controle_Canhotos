@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,11 @@ class CanhotoControllerTest {
 		return criarCarga("COLETADA", "EM_TRANSITO", "ENTREGUE");
 	}
 
+	/** Mesmo fuso que a API usa para decidir se a data é futura (o CI roda em UTC). */
+	private static LocalDate hoje() {
+		return LocalDate.now(ZoneId.of("America/Sao_Paulo"));
+	}
+
 	private String corpo(String status, LocalDate data, String observacao, Boolean confirmada) {
 		return """
 				{"status": "%s", "dataRecebimento": "%s", "observacao": %s, "dataFuturaConfirmada": %s}
@@ -63,10 +69,10 @@ class CanhotoControllerTest {
 		long id = criarCargaEntregue();
 
 		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
-				.content(corpo("RECEBIDO", LocalDate.now(), null, null)))
+				.content(corpo("RECEBIDO", hoje(), null, null)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("RECEBIDO"))
-				.andExpect(jsonPath("$.dataRecebimento").value(LocalDate.now().toString()))
+				.andExpect(jsonPath("$.dataRecebimento").value(hoje().toString()))
 				.andExpect(jsonPath("$.historico.length()").value(2));
 
 		mvc.perform(get("/cargas/{id}/canhoto", id))
@@ -79,13 +85,13 @@ class CanhotoControllerTest {
 		long id = criarCargaEntregue();
 
 		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
-				.content(corpo("DIVERGENTE", LocalDate.now(), "Assinatura ilegível", false)))
+				.content(corpo("DIVERGENTE", hoje(), "Assinatura ilegível", false)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("DIVERGENTE"))
 				.andExpect(jsonPath("$.observacao").value("Assinatura ilegível"));
 
 		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
-				.content(corpo("RECEBIDO", LocalDate.now(), null, false)))
+				.content(corpo("RECEBIDO", hoje(), null, false)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("RECEBIDO"))
 				.andExpect(jsonPath("$.observacao").doesNotExist())
@@ -98,7 +104,7 @@ class CanhotoControllerTest {
 		long id = criarCargaEntregue();
 
 		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
-				.content(corpo("DIVERGENTE", LocalDate.now(), null, false)))
+				.content(corpo("DIVERGENTE", hoje(), null, false)))
 				.andExpect(status().isUnprocessableContent())
 				.andExpect(jsonPath("$.detail").value(containsString("Observação")));
 	}
@@ -108,7 +114,7 @@ class CanhotoControllerTest {
 		long id = criarCarga("COLETADA");
 
 		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
-				.content(corpo("RECEBIDO", LocalDate.now(), null, false)))
+				.content(corpo("RECEBIDO", hoje(), null, false)))
 				.andExpect(status().isUnprocessableContent())
 				.andExpect(jsonPath("$.detail").value(containsString("ENTREGUE")));
 	}
@@ -116,7 +122,7 @@ class CanhotoControllerTest {
 	@Test
 	void dataFuturaPedeConfirmacaoEPassaQuandoConfirmada() throws Exception {
 		long id = criarCargaEntregue();
-		LocalDate futura = LocalDate.now().plusDays(30);
+		LocalDate futura = hoje().plusDays(30);
 
 		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
 				.content(corpo("RECEBIDO", futura, null, false)))
@@ -138,7 +144,7 @@ class CanhotoControllerTest {
 		long id = criarCargaEntregue();
 
 		mvc.perform(post("/cargas/{id}/canhoto/registros", id).contentType(MediaType.APPLICATION_JSON)
-				.content(corpo("PENDENTE", LocalDate.now(), null, false)))
+				.content(corpo("PENDENTE", hoje(), null, false)))
 				.andExpect(status().isUnprocessableContent());
 	}
 
@@ -157,7 +163,7 @@ class CanhotoControllerTest {
 	void retorna404ParaCargaInexistente() throws Exception {
 		mvc.perform(get("/cargas/999999/canhoto")).andExpect(status().isNotFound());
 		mvc.perform(post("/cargas/999999/canhoto/registros").contentType(MediaType.APPLICATION_JSON)
-				.content(corpo("RECEBIDO", LocalDate.now(), null, false)))
+				.content(corpo("RECEBIDO", hoje(), null, false)))
 				.andExpect(status().isNotFound());
 	}
 }
