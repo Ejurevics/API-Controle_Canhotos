@@ -85,9 +85,9 @@ erDiagram
 - O canhoto só pode ser registrado (`RECEBIDO` ou `DIVERGENTE`) com o CT-e (carga) `ENTREGUE`.
 - Data de recebimento posterior à data atual (no fuso `America/Sao_Paulo`, independente do fuso do servidor) gera aviso e só é aceita com confirmação explícita, que fica marcada no histórico do canhoto.
 - O canhoto pode ser registrado mais de uma vez (ex.: `DIVERGENTE` e depois `RECEBIDO`). Cada registro fica em `historico_canhoto` com status, data e observação; o canhoto guarda só o estado atual.
-- Toda mudança de status da carga gera um registro em `historico_status`.
-- Cada registro de histórico guarda o login de quem fez a mudança (`alteradoPor` na carga, `registradoPor` no canhoto), tirado do token. Os registros iniciais ficam com quem criou a coleta. Registros gravados antes da v0.5.0 ficam com o campo nulo.
-- Cargas criadas antes do agrupamento por CT-e foram migradas com uma chave de acesso **provisória** (prefixo `99` + id, `chaveProvisoria: true`). Ela é corrigida com `PATCH /cargas/{id}/chave-acesso`, que aceita só chave válida e ainda não usada e só vale para chave provisória (a definitiva não muda); `GET /cargas?chaveProvisoria=true` lista as pendentes.
+- Toda mudança de status da carga gera um registro em `historico_status`, e toda mudança de situação da coleta, em `historico_situacao_coleta` (`historico` em `GET /coletas/{id}`). Coletas anteriores à v0.5.0 começam com um registro da situação em que estavam, sem situação anterior.
+- Cada registro de histórico guarda o login de quem fez a mudança (`alteradoPor` na carga e na coleta, `registradoPor` no canhoto), tirado do token. Os registros iniciais ficam com quem criou a coleta. Registros gravados antes da v0.5.0 ficam com o campo nulo.
+- Cargas criadas antes do agrupamento por CT-e foram migradas com uma chave de acesso **provisória** (prefixo `99` + id, `chaveProvisoria: true`). Ela é corrigida com `PATCH /cargas/{id}/chave-acesso`, que aceita só chave válida e ainda não usada e só vale para chave provisória (a definitiva não muda); `GET /cargas?chaveProvisoria=true` lista as pendentes. A carga guarda a correção: `correcaoChave` em `GET /cargas/{id}` traz a chave provisória anterior, quando e por quem foi corrigida.
 
 ### Transições de status da carga
 
@@ -118,7 +118,7 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 |---|---|---|
 | `POST` | `/coletas` | Cria uma coleta com seus CT-es (cargas) e as NFs de cada um (`201` + `Location`) |
 | `GET` | `/coletas` | Lista coletas com filtros e paginação |
-| `GET` | `/coletas/{id}` | Busca a coleta com seus CT-es e NFs |
+| `GET` | `/coletas/{id}` | Busca a coleta com seus CT-es, NFs e o histórico de situação |
 | `PATCH` | `/coletas/{id}/situacao` | Altera a situação da coleta (`{"situacao": "..."}`) |
 | `GET` | `/cargas` | Lista cargas (CT-es) com filtros e paginação |
 | `GET` | `/cargas/{id}` | Busca a carga com as NFs e o histórico de status |
@@ -321,7 +321,7 @@ src/main/java/br/com/controlecanhotos/
 ├── carga/         Carga (CT-e), status, regras de transição e DTOs
 ├── notafiscal/    Nota fiscal (de 1 a N por CT-e) e DTOs
 ├── canhoto/       Canhoto (um por NF), status, service, controllers e DTOs
-├── historico/     Histórico de status da carga e de registros do canhoto
+├── historico/     Histórico de situação da coleta, de status da carga e de registros do canhoto
 ├── usuario/       Usuário, perfil (ADMIN, OPERADOR) e gestão de usuários
 ├── seguranca/     Login, emissão e validação do JWT, regras de acesso e ADMIN inicial
 └── shared/        Exceções, tratamento global de erros (ApiExceptionHandler) e paginação
@@ -353,4 +353,5 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Limite de tentativas de login por login e por IP ([ADR 0003](docs/adr/0003-limite-tentativas-login.md)).
 - [x] Revogar os tokens de quem é desativado ou troca a senha ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
 - [x] Alterar o perfil de um usuário.
+- [x] Histórico de situação da coleta e registro da correção da chave provisória, com o usuário.
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
