@@ -261,4 +261,4 @@ docker-compose.yml App + PostgreSQL com healthcheck
 - [x] Testes de service.
 - [x] Regra para concluir uma coleta com base no status das cargas.
 - [ ] Autenticação.
-- [ ] Agrupar NFs por CT-e (uma carga com várias NFs).
+- [ ] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
