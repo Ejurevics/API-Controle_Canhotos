@@ -2,7 +2,7 @@
 
 API REST para controle de coletas, cargas e devolução de canhotos (comprovantes de entrega assinados) em uma transportadora, com histórico de status por carga.
 
-**Versão atual: `v0.1.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos). Listagens com filtros e paginação, autenticação e agrupamento por CT-e ainda não existem; veja o [Roadmap](#roadmap).
+**Versão atual: `v0.2.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas. Autenticação e agrupamento por CT-e ainda não existem; veja o [Roadmap](#roadmap).
 
 ## Modelo de domínio
 
@@ -247,7 +247,7 @@ docker-compose.yml App + PostgreSQL com healthcheck
 
 ## Fluxo de desenvolvimento
 
-- `main`: versões estáveis, marcadas com tag (`v0.1.0`). Só recebe a `develop` via PR de release, com merge commit.
+- `main`: versões estáveis, marcadas com tag (`v0.2.0`). Só recebe a `develop` via PR de release, com merge commit.
 - `develop`: integração. Recebe os PRs de feature, com squash.
 - Branches de trabalho nascem da `develop` (`feat/`, `fix/`, `chore/`, `docs/`, `refactor/`) e são apagadas após o merge.
 - Commits seguem Conventional Commits (`feat(coleta): adiciona ...`).
@@ -255,8 +255,8 @@ docker-compose.yml App + PostgreSQL com healthcheck
 
 ## Roadmap
 
-- [ ] Listagens com filtros e paginação (coletas por situação, cliente e período; cargas por status; canhotos pendentes).
-- [ ] Testes de service.
+- [x] Listagens com filtros e paginação (coletas por situação, cliente e período; cargas por status; canhotos pendentes).
+- [x] Testes de service.
 - [ ] Regra para concluir uma coleta com base no status das cargas.
 - [ ] Autenticação.
 - [ ] Agrupar NFs por CT-e (uma carga com várias NFs).
