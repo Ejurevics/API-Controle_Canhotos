@@ -1,6 +1,6 @@
 # ADR 0001: Agrupar NFs por CT-e
 
-- **Status:** proposta (aguardando revisão)
+- **Status:** aceita (implementada; sai na `v0.3.0`)
 - **Data:** 2026-10-14
 
 ## Contexto
@@ -97,3 +97,9 @@ Migration Flyway nova (nunca altera as já mergeadas):
 
 1. Este ADR, em PR só de documentação.
 2. Implementação (migration, domínio, services, controllers, testes e README) em um PR único, porque o modelo não compila pela metade. Depois, release `v0.3.0`.
+
+## Notas da implementação
+
+- **Contagens na listagem de cargas:** `quantidadeNotasFiscais` e `canhotosPendentes` são calculadas pelo banco (`@Formula`) junto com a consulta paginada. Carregar as NFs de cada carga da página geraria uma consulta por linha; um `join fetch` de coleção quebraria a paginação no banco.
+- **Rota antiga do canhoto removida:** `/cargas/{id}/canhoto` passa a responder `404`; use `/notas-fiscais/{id}/canhoto`.
+- **Migration validada com dados:** `MigracaoNotasFiscaisTest` aplica a V3 sobre dados criados no esquema da V2 e confere NFs, canhotos, históricos, chaves provisórias e as novas unicidades.

@@ -1,15 +1,16 @@
 # API Controle de Canhotos
 
-API REST para controle de coletas, cargas e devolução de canhotos (comprovantes de entrega assinados) em uma transportadora, com histórico de status por carga.
+API REST para controle de coletas, cargas (CT-e) e devolução de canhotos (comprovantes de entrega assinados) em uma transportadora, com histórico de status por carga.
 
-**Versão atual: `v0.2.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas. Autenticação e agrupamento por CT-e ainda não existem; veja o [Roadmap](#roadmap).
+**Versão atual: `v0.2.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas. A `develop` já agrupa várias NFs por CT-e (mudança incompatível na API, prevista para a `v0.3.0`; veja o [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)). Autenticação ainda não existe; veja o [Roadmap](#roadmap).
 
 ## Modelo de domínio
 
 ```mermaid
 erDiagram
     COLETA ||--|{ CARGA : agrupa
-    CARGA ||--|| CANHOTO : possui
+    CARGA ||--|{ NOTA_FISCAL : contem
+    NOTA_FISCAL ||--|| CANHOTO : possui
     CARGA ||--|{ HISTORICO_STATUS : registra
     CANHOTO ||--|{ HISTORICO_CANHOTO : registra
 
@@ -26,10 +27,8 @@ erDiagram
     CARGA {
         bigint id PK
         bigint coleta_id FK
-        char emitente_cnpj UK "UK: emitente + série + número"
-        smallint serie_nota_fiscal UK
-        integer numero_nota_fiscal UK
-        numeric peso_kg
+        char chave_acesso UK "CT-e, 44 dígitos"
+        boolean chave_provisoria
         varchar cidade_destino
         char uf_destino
         varchar status "AGUARDANDO_COLETA | COLETADA | EM_TRANSITO | ENTREGUE | OCORRENCIA | DEVOLVIDA"
@@ -37,9 +36,20 @@ erDiagram
         timestamptz atualizado_em
     }
 
+    NOTA_FISCAL {
+        bigint id PK
+        bigint carga_id FK
+        char emitente_cnpj UK "UK: carga + emitente + série + número"
+        smallint serie_nota_fiscal UK
+        integer numero_nota_fiscal UK
+        numeric peso_kg
+        timestamptz criado_em
+        timestamptz atualizado_em
+    }
+
     CANHOTO {
         bigint id PK
-        bigint carga_id FK,UK
+        bigint nota_fiscal_id FK,UK
         varchar status "PENDENTE | RECEBIDO | DIVERGENTE"
         date data_recebimento
         varchar observacao
@@ -68,14 +78,15 @@ erDiagram
     }
 ```
 
-- Cada carga corresponde a **uma NF**, identificada por CNPJ do emitente + série + número (combinação única por lei).
-- Se não informados, o CNPJ do emitente assume o do cliente da coleta e a série assume `1`.
-- O canhoto nasce `PENDENTE` junto com a carga. `RECEBIDO` e `DIVERGENTE` exigem data de recebimento; `DIVERGENTE` exige observação.
-- O canhoto só pode ser registrado (`RECEBIDO` ou `DIVERGENTE`) com a carga `ENTREGUE`.
+- Cada carga corresponde a **um CT-e**, identificado pela chave de acesso de 44 dígitos (única no sistema), e agrupa **de 1 a N notas fiscais**. O status e o histórico de status são do CT-e; o peso total é a soma das NFs.
+- A NF é identificada por CNPJ do emitente + série + número, **única só dentro do CT-e**: o mesmo número pode se repetir em CT-es diferentes, porque a numeração segue a de cada cliente.
+- Se não informados, o CNPJ do emitente da NF assume o do cliente da coleta e a série assume `1`.
+- Cada NF tem o seu canhoto, que nasce `PENDENTE` junto com ela. `RECEBIDO` e `DIVERGENTE` exigem data de recebimento; `DIVERGENTE` exige observação.
+- O canhoto só pode ser registrado (`RECEBIDO` ou `DIVERGENTE`) com o CT-e (carga) `ENTREGUE`.
 - Data de recebimento posterior à data atual (no fuso `America/Sao_Paulo`, independente do fuso do servidor) gera aviso e só é aceita com confirmação explícita, que fica marcada no histórico do canhoto.
 - O canhoto pode ser registrado mais de uma vez (ex.: `DIVERGENTE` e depois `RECEBIDO`). Cada registro fica em `historico_canhoto` com status, data e observação; o canhoto guarda só o estado atual.
 - Toda mudança de status da carga gera um registro em `historico_status`.
-- Evolução prevista: agrupar NFs por CT-e (uma carga com várias NFs).
+- Cargas criadas antes do agrupamento por CT-e foram migradas com uma chave de acesso **provisória** (prefixo `99` + id, `chaveProvisoria: true`), para ser corrigida depois.
 
 ### Transições de status da carga
 
@@ -98,22 +109,22 @@ Registrar `OCORRENCIA` exige motivo.
 | `EM_ANDAMENTO` | `CONCLUIDA`, `CANCELADA` |
 | `CONCLUIDA`, `CANCELADA` | — (finais) |
 
-Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. Caso contrário, responde `422` listando as notas pendentes e seus status (ex.: `1002 (EM_TRANSITO)`). O status do canhoto não é considerado. Cancelar não tem essa exigência.
+Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. Caso contrário, responde `422` listando os CT-es pendentes (chave de acesso) e seus status (ex.: `35261011111111000111570010000012341000012345 (EM_TRANSITO)`). O status do canhoto não é considerado. Cancelar não tem essa exigência.
 
 ## Endpoints
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/coletas` | Cria uma coleta com suas cargas (`201` + `Location`) |
+| `POST` | `/coletas` | Cria uma coleta com seus CT-es (cargas) e as NFs de cada um (`201` + `Location`) |
 | `GET` | `/coletas` | Lista coletas com filtros e paginação |
-| `GET` | `/coletas/{id}` | Busca a coleta com suas cargas |
+| `GET` | `/coletas/{id}` | Busca a coleta com seus CT-es e NFs |
 | `PATCH` | `/coletas/{id}/situacao` | Altera a situação da coleta (`{"situacao": "..."}`) |
-| `GET` | `/cargas` | Lista cargas com filtros e paginação |
-| `GET` | `/cargas/{id}` | Busca a carga com o histórico de status |
+| `GET` | `/cargas` | Lista cargas (CT-es) com filtros e paginação |
+| `GET` | `/cargas/{id}` | Busca a carga com as NFs e o histórico de status |
 | `PATCH` | `/cargas/{id}/status` | Altera o status da carga (`{"status": "...", "motivo": "..."}`); `motivo` é obrigatório para `OCORRENCIA` |
-| `GET` | `/canhotos` | Lista canhotos (ex.: pendentes por cliente ou período) com paginação |
-| `GET` | `/cargas/{id}/canhoto` | Busca o canhoto com o histórico de registros |
-| `POST` | `/cargas/{id}/canhoto/registros` | Registra o canhoto como `RECEBIDO` ou `DIVERGENTE` |
+| `GET` | `/canhotos` | Lista canhotos, um por NF (ex.: pendentes por cliente ou período), com paginação |
+| `GET` | `/notas-fiscais/{id}/canhoto` | Busca o canhoto da NF com o histórico de registros |
+| `POST` | `/notas-fiscais/{id}/canhoto/registros` | Registra o canhoto da NF como `RECEBIDO` ou `DIVERGENTE` |
 
 ### Listagens
 
@@ -125,7 +136,7 @@ Todos os filtros são opcionais e combinados com `E`. Datas no formato `AAAA-MM-
 | `GET /cargas` | `status`, `coletaId` |
 | `GET /canhotos` | `status`, `clienteCnpj`, `dataInicio`, `dataFim` (sobre a data programada da coleta) |
 
-Paginação: `pagina` (começa em `0`, padrão `0`) e `tamanho` (padrão `20`, máximo `100`). A ordenação é fixa: coletas pela data programada (mais recente primeiro), cargas e canhotos por `id`. A resposta traz `content` e `page` (`size`, `number`, `totalElements`, `totalPages`).
+Paginação: `pagina` (começa em `0`, padrão `0`) e `tamanho` (padrão `20`, máximo `100`). A ordenação é fixa: coletas pela data programada (mais recente primeiro), cargas e canhotos por `id`. A resposta traz `content` e `page` (`size`, `number`, `totalElements`, `totalPages`). Na listagem de cargas, cada item traz `quantidadeNotasFiscais` e `canhotosPendentes` em vez das NFs; use `GET /cargas/{id}` para o detalhe.
 
 Exemplo, canhotos pendentes de um cliente em novembro:
 
@@ -135,7 +146,7 @@ GET /canhotos?status=PENDENTE&clienteCnpj=11111111000111&dataInicio=2026-11-01&d
 
 Filtro com valor inválido (`situacao=XYZ`, data malformada) responde `400`; período invertido e `pagina`/`tamanho` fora do limite respondem `422`.
 
-Registro do canhoto (`observacao` obrigatória na `DIVERGENTE`; `dataFuturaConfirmada` opcional, padrão `false`):
+Registro do canhoto de uma NF (`observacao` obrigatória na `DIVERGENTE`; `dataFuturaConfirmada` opcional, padrão `false`):
 
 ```json
 { "status": "RECEBIDO", "dataRecebimento": "2026-10-14", "dataFuturaConfirmada": false }
@@ -143,7 +154,7 @@ Registro do canhoto (`observacao` obrigatória na `DIVERGENTE`; `dataFuturaConfi
 
 Se a data for posterior a hoje (fuso `America/Sao_Paulo`), a primeira tentativa responde `409` com `confirmacaoNecessaria: true`. O cliente avisa o usuário e reenvia com `dataFuturaConfirmada: true`.
 
-Exemplo de `POST /coletas` (`emitenteCnpj` e `serieNotaFiscal` são opcionais):
+Exemplo de `POST /coletas` com um CT-e de duas NFs (`emitenteCnpj` e `serieNotaFiscal` são opcionais em cada NF):
 
 ```json
 {
@@ -151,7 +162,15 @@ Exemplo de `POST /coletas` (`emitenteCnpj` e `serieNotaFiscal` são opcionais):
   "clienteCnpj": "11111111000111",
   "dataProgramada": "2026-10-20",
   "cargas": [
-    { "numeroNotaFiscal": 1001, "pesoKg": 150.5, "cidadeDestino": "Campinas", "ufDestino": "SP" }
+    {
+      "chaveAcesso": "35261011111111000111570010000012341000012345",
+      "cidadeDestino": "Campinas",
+      "ufDestino": "SP",
+      "notasFiscais": [
+        { "numeroNotaFiscal": 1001, "pesoKg": 150.5 },
+        { "numeroNotaFiscal": 1002, "pesoKg": 49.5 }
+      ]
+    }
   ]
 }
 ```
@@ -163,7 +182,7 @@ Erros seguem o formato `ProblemDetail` (RFC 9457):
 | `400` | Dados inválidos (campo a campo em `erros`) |
 | `404` | Recurso não encontrado |
 | `409` | Confirmação necessária (`confirmacaoNecessaria: true`) ou violação de integridade |
-| `422` | Regra de negócio violada (ex.: NF já cadastrada) |
+| `422` | Regra de negócio violada (ex.: CT-e já cadastrado, NF repetida no mesmo CT-e) |
 
 ## Stack
 
@@ -235,8 +254,9 @@ Perfis Spring:
 ```
 src/main/java/br/com/controlecanhotos/
 ├── coleta/        Coleta, situação, service, controller e DTOs
-├── carga/         Carga, status, regras de transição e DTOs
-├── canhoto/       Canhoto, status, service, controller e DTOs
+├── carga/         Carga (CT-e), status, regras de transição e DTOs
+├── notafiscal/    Nota fiscal (de 1 a N por CT-e) e DTOs
+├── canhoto/       Canhoto (um por NF), status, service, controllers e DTOs
 ├── historico/     Histórico de status da carga e de registros do canhoto
 └── shared/        Exceções, tratamento global de erros (ApiExceptionHandler) e paginação
 src/main/resources/
@@ -261,4 +281,4 @@ docker-compose.yml App + PostgreSQL com healthcheck
 - [x] Testes de service.
 - [x] Regra para concluir uma coleta com base no status das cargas.
 - [ ] Autenticação.
-- [ ] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
+- [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md); sai na `v0.3.0`.
