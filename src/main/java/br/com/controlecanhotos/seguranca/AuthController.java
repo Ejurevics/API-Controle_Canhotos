@@ -14,6 +14,7 @@ import br.com.controlecanhotos.seguranca.dto.LoginResponse;
 import br.com.controlecanhotos.usuario.UsuarioService;
 import br.com.controlecanhotos.usuario.dto.TrocarSenhaRequest;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 @RestController
@@ -30,8 +31,8 @@ public class AuthController {
 
 	@PostMapping("/login")
 	@SecurityRequirements
-	LoginResponse login(@RequestBody @Valid LoginRequest request) {
-		return service.entrar(request.login(), request.senha());
+	LoginResponse login(@RequestBody @Valid LoginRequest request, HttpServletRequest http) {
+		return service.entrar(request.login(), request.senha(), http.getRemoteAddr());
 	}
 
 	/** Qualquer usuário logado troca a própria senha; o token atual continua valendo até expirar. */

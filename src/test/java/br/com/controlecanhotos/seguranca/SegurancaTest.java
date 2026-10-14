@@ -2,6 +2,7 @@ package br.com.controlecanhotos.seguranca;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -28,6 +29,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 
@@ -168,6 +170,67 @@ class SegurancaTest {
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.status").value(403))
 				.andExpect(jsonPath("$.detail").value(containsString("não tem permissão")));
+	}
+
+	/**
+	 * Tentativa de login vinda de {@code ip}. Os testes do limite usam IPs próprios, porque o contador fica no
+	 * contexto Spring compartilhado entre as classes de teste.
+	 */
+	private ResultActions tentar(String login, String senha, String ip) throws Exception {
+		return mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content(credenciais(login, senha))
+				.with(requisicao -> {
+					requisicao.setRemoteAddr(ip);
+					return requisicao;
+				}));
+	}
+
+	@Test
+	void bloqueiaOLoginDepoisDeCincoFalhasMesmoComASenhaCerta() throws Exception {
+		criarUsuario("alvo-forca-bruta", Perfil.OPERADOR, true);
+		for (int i = 0; i < 5; i++) {
+			tentar("alvo-forca-bruta", "senha-errada", "10.1.0.1").andExpect(status().isUnauthorized());
+		}
+
+		tentar("alvo-forca-bruta", "senha-forte-1", "10.1.0.2")
+				.andExpect(status().isTooManyRequests())
+				// Até 900 s (15 min), descontado o tempo das tentativas anteriores.
+				.andExpect(header().string(HttpHeaders.RETRY_AFTER, matchesPattern("8[6-9]\\d|900")))
+				.andExpect(jsonPath("$.status").value(429))
+				.andExpect(jsonPath("$.detail").value(containsString("Muitas tentativas de login")));
+	}
+
+	@Test
+	void loginInexistenteTambemEhBloqueado() throws Exception {
+		for (int i = 0; i < 5; i++) {
+			tentar("ninguem-aqui", "qualquer", "10.2.0.1").andExpect(status().isUnauthorized());
+		}
+
+		tentar("ninguem-aqui", "qualquer", "10.2.0.1").andExpect(status().isTooManyRequests());
+	}
+
+	@Test
+	void bloqueiaOIpQueErraEmVariosLogins() throws Exception {
+		for (int i = 0; i < 20; i++) {
+			tentar("spray-" + i, "senha-comum", "10.3.0.1").andExpect(status().isUnauthorized());
+		}
+
+		tentar("admin", "admin12345", "10.3.0.1").andExpect(status().isTooManyRequests());
+		tentar("admin", "admin12345", "10.3.0.2").andExpect(status().isOk());
+	}
+
+	@Test
+	void loginCertoZeraAsFalhasDoLogin() throws Exception {
+		criarUsuario("erra-e-acerta", Perfil.OPERADOR, true);
+		for (int i = 0; i < 4; i++) {
+			tentar("erra-e-acerta", "senha-errada", "10.4.0.1").andExpect(status().isUnauthorized());
+		}
+		tentar("erra-e-acerta", "senha-forte-1", "10.4.0.1").andExpect(status().isOk());
+
+		for (int i = 0; i < 4; i++) {
+			tentar("erra-e-acerta", "senha-errada", "10.4.0.1").andExpect(status().isUnauthorized());
+		}
+		tentar("erra-e-acerta", "senha-forte-1", "10.4.0.1").andExpect(status().isOk());
 	}
 
 	@Test
