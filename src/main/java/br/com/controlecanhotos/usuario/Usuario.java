@@ -79,6 +79,14 @@ public class Usuario {
 		invalidarTokens();
 	}
 
+	/** Invalida os tokens já emitidos, que levam o perfil antigo; o mesmo perfil não muda nada. */
+	public void alterarPerfil(Perfil novoPerfil) {
+		if (novoPerfil != perfil) {
+			perfil = novoPerfil;
+			invalidarTokens();
+		}
+	}
+
 	private void invalidarTokens() {
 		versaoCredencial++;
 	}
