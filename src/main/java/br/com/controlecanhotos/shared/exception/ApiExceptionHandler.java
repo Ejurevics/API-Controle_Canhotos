@@ -3,14 +3,34 @@ package br.com.controlecanhotos.shared.exception;
 import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+	@ExceptionHandler(AuthenticationException.class)
+	ResponseEntity<ProblemDetail> naoAutenticado(AuthenticationException ex) {
+		String detalhe = ex instanceof BadCredentialsException ? ex.getMessage()
+				: "Autenticação necessária: envie um token válido em Authorization: Bearer <token>";
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+				.header(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+				.body(ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, detalhe));
+	}
+
+	@ExceptionHandler(AccessDeniedException.class)
+	ProblemDetail semPermissao(AccessDeniedException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN,
+				"Seu perfil não tem permissão para esta operação");
+	}
 
 	@ExceptionHandler(RecursoNaoEncontradoException.class)
 	ProblemDetail recursoNaoEncontrado(RecursoNaoEncontradoException ex) {

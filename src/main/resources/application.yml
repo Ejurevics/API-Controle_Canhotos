@@ -22,11 +22,30 @@ management:
       exposure:
         include: health
 
+app:
+  seguranca:
+    jwt:
+      # HS256: pelo menos 32 bytes. Sem valor padrão fora do perfil dev.
+      segredo: ${JWT_SECRET:}
+      expiracao: ${JWT_EXPIRACAO:PT1H}
+    admin-inicial:
+      login: ${ADMIN_LOGIN:admin}
+      nome: ${ADMIN_NOME:Administrador}
+      senha: ${ADMIN_SENHA:}
+
 ---
 spring:
   config:
     activate:
       on-profile: dev
+
+# Só para rodar local e nos testes; nunca usar estes valores fora da máquina de desenvolvimento.
+app:
+  seguranca:
+    jwt:
+      segredo: ${JWT_SECRET:segredo-de-desenvolvimento-local-com-mais-de-32-bytes}
+    admin-inicial:
+      senha: ${ADMIN_SENHA:admin12345}
 
 logging:
   level:

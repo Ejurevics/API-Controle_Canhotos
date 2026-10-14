@@ -25,6 +25,11 @@ services:
       DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-canhotos}
       DB_USERNAME: ${DB_USERNAME:-canhotos}
       DB_PASSWORD: ${DB_PASSWORD:-canhotos}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env (veja .env.example)}
+      JWT_EXPIRACAO: ${JWT_EXPIRACAO:-PT1H}
+      ADMIN_LOGIN: ${ADMIN_LOGIN:-admin}
+      ADMIN_NOME: ${ADMIN_NOME:-Administrador}
+      ADMIN_SENHA: ${ADMIN_SENHA:?defina ADMIN_SENHA no .env (veja .env.example)}
     ports:
       - "${APP_PORT:-8080}:8080"
     healthcheck:
