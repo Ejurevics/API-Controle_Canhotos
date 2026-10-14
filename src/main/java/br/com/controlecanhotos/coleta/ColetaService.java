@@ -1,17 +1,23 @@
 package br.com.controlecanhotos.coleta;
 
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.web.PagedModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import br.com.controlecanhotos.carga.CargaRepository;
 import br.com.controlecanhotos.carga.dto.CriarCargaRequest;
 import br.com.controlecanhotos.coleta.dto.ColetaResponse;
+import br.com.controlecanhotos.coleta.dto.ColetaResumoResponse;
 import br.com.controlecanhotos.coleta.dto.CriarColetaRequest;
 import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
+import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
 
 @Service
 public class ColetaService {
@@ -55,6 +61,31 @@ public class ColetaService {
 		return coletaRepository.findById(id)
 				.map(ColetaResponse::de)
 				.orElseThrow(() -> new RecursoNaoEncontradoException("Coleta não encontrada: " + id));
+	}
+
+	@Transactional(readOnly = true)
+	public PagedModel<ColetaResumoResponse> listar(SituacaoColeta situacao, String clienteCnpj,
+			LocalDate dataInicio, LocalDate dataFim, int pagina, int tamanho) {
+		ParametrosListagem.validarPeriodo(dataInicio, dataFim);
+
+		Specification<Coleta> filtro = (root, query, cb) -> cb.conjunction();
+		if (situacao != null) {
+			filtro = filtro.and((root, query, cb) -> cb.equal(root.get("situacao"), situacao));
+		}
+		if (clienteCnpj != null) {
+			filtro = filtro.and((root, query, cb) -> cb.equal(root.get("clienteCnpj"), clienteCnpj));
+		}
+		if (dataInicio != null) {
+			filtro = filtro.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("dataProgramada"), dataInicio));
+		}
+		if (dataFim != null) {
+			filtro = filtro.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("dataProgramada"), dataFim));
+		}
+
+		Sort ordenacao = Sort.by(Sort.Order.desc("dataProgramada"), Sort.Order.desc("id"));
+		return new PagedModel<>(coletaRepository
+				.findAll(filtro, ParametrosListagem.paginar(pagina, tamanho, ordenacao))
+				.map(ColetaResumoResponse::de));
 	}
 
 	@Transactional
