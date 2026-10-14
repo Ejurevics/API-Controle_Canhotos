@@ -25,7 +25,7 @@ Rotas públicas: `POST /auth/login`, `/actuator/health` e a documentação (`/sw
 - **Positivas:** toda operação exige usuário identificado; permissões por perfil; nenhuma dependência externa.
 - **Negativas:** o `docker compose` deixa de subir sem configuração (é preciso copiar `.env.example` para `.env` e preencher dois valores); os clientes da API passam a precisar de login.
 - **Riscos aceitos:**
-  - Token não é revogável antes de expirar: desativar um usuário bloqueia novos logins, mas um token já emitido vale até a expiração (1 hora por padrão).
+  - Token não é revogável antes de expirar: desativar um usuário bloqueia novos logins, mas um token já emitido vale até a expiração (1 hora por padrão). Tratado depois no [ADR 0004](0004-revogar-tokens-por-versao-de-credencial.md).
   - Sem limite de tentativas de login (rate limiting) nesta versão. Tratado depois no [ADR 0003](0003-limite-tentativas-login.md).
   - Segredo simétrico (HS256): quem valida também consegue emitir. Aceitável com um único serviço.
 

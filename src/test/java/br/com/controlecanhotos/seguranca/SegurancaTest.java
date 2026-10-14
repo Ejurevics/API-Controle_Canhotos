@@ -117,6 +117,7 @@ class SegurancaTest {
 		Jwt jwt = jwtDecoder.decode(token);
 		assertThat(jwt.getSubject()).isEqualTo("admin");
 		assertThat(jwt.getClaimAsString("perfil")).isEqualTo("ADMIN");
+		assertThat(jwt.<Number>getClaim(SegurancaConfig.CLAIM_VERSAO_CREDENCIAL)).isNotNull();
 		assertThat(jwt.getClaimAsString("iss")).isEqualTo(SegurancaConfig.EMISSOR);
 		assertThat(jwt.getExpiresAt()).isCloseTo(Instant.now().plus(1, ChronoUnit.HOURS),
 				org.assertj.core.api.Assertions.within(1, ChronoUnit.MINUTES));
@@ -260,6 +261,8 @@ class SegurancaTest {
 				.content("{\"senhaAtual\": \"senha-forte-1\", \"novaSenha\": \"senha-nova-12\"}"))
 				.andExpect(status().isNoContent());
 
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(token)))
+				.andExpect(status().isUnauthorized());
 		entrar("troca-senha", "senha-nova-12");
 	}
 
@@ -295,16 +298,78 @@ class SegurancaTest {
 		}
 	}
 
-	/** Token assinado com a chave certa, mas com emissor e data de emissão escolhidos (vale 1h). */
+	/**
+	 * Token do admin assinado com a chave certa e a versão de credencial atual, mas com emissor e data de
+	 * emissão escolhidos (vale 1h).
+	 */
 	private String token(String emissor, Instant emitidoEm) {
-		JwtClaimsSet claims = JwtClaimsSet.builder()
+		int versao = usuarios.findByLogin("admin").orElseThrow().getVersaoCredencial();
+		return token(emissor, emitidoEm, versao);
+	}
+
+	private String token(String emissor, Instant emitidoEm, Integer versao) {
+		JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
 				.issuer(emissor)
 				.subject("admin")
 				.issuedAt(emitidoEm)
 				.expiresAt(emitidoEm.plus(1, ChronoUnit.HOURS))
-				.claim("perfil", "ADMIN")
-				.build();
-		return jwtEncoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
-				.getTokenValue();
+				.claim("perfil", "ADMIN");
+		if (versao != null) {
+			claims.claim(SegurancaConfig.CLAIM_VERSAO_CREDENCIAL, versao);
+		}
+		return jwtEncoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(),
+				claims.build())).getTokenValue();
+	}
+
+	@Test
+	void tokenMontadoComAVersaoAtualEhAceito() throws Exception {
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(token(SegurancaConfig.EMISSOR,
+				Instant.now())))).andExpect(status().isOk());
+	}
+
+	@Test
+	void tokenSemVersaoDeCredencialResponde401() throws Exception {
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(token(SegurancaConfig.EMISSOR,
+				Instant.now(), null)))).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void desativarDerrubaOsTokensEReativarNaoOsDevolve() throws Exception {
+		criarUsuario("sera-desativado", Perfil.OPERADOR, true);
+		String tokenAntigo = entrar("sera-desativado", "senha-forte-1");
+		String admin = entrar("admin", "admin12345");
+		long id = usuarios.findByLogin("sera-desativado").orElseThrow().getId();
+
+		alterarAtivo(admin, id, false);
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(tokenAntigo)))
+				.andExpect(status().isUnauthorized());
+
+		alterarAtivo(admin, id, true);
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(tokenAntigo)))
+				.andExpect(status().isUnauthorized());
+		String tokenNovo = entrar("sera-desativado", "senha-forte-1");
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(tokenNovo)))
+				.andExpect(status().isOk());
+	}
+
+	@Test
+	void senhaRedefinidaPeloAdminDerrubaOsTokensDoUsuario() throws Exception {
+		criarUsuario("senha-redefinida", Perfil.OPERADOR, true);
+		String tokenAntigo = entrar("senha-redefinida", "senha-forte-1");
+		long id = usuarios.findByLogin("senha-redefinida").orElseThrow().getId();
+
+		mvc.perform(patch("/usuarios/{id}/senha", id).header(HttpHeaders.AUTHORIZATION,
+				bearer(entrar("admin", "admin12345")))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"novaSenha\": \"senha-nova-12\"}"))
+				.andExpect(status().isNoContent());
+
+		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(tokenAntigo)))
+				.andExpect(status().isUnauthorized());
+	}
+
+	private void alterarAtivo(String tokenAdmin, long id, boolean ativo) throws Exception {
+		mvc.perform(patch("/usuarios/{id}/ativo", id).header(HttpHeaders.AUTHORIZATION, bearer(tokenAdmin))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"ativo\": %s}".formatted(ativo)))
+				.andExpect(status().isOk());
 	}
 }

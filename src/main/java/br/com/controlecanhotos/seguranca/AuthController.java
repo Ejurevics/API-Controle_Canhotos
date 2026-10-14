@@ -35,7 +35,7 @@ public class AuthController {
 		return service.entrar(request.login(), request.senha(), http.getRemoteAddr());
 	}
 
-	/** Qualquer usuário logado troca a própria senha; o token atual continua valendo até expirar. */
+	/** Qualquer usuário logado troca a própria senha; todos os tokens dele, inclusive o atual, deixam de valer. */
 	@PatchMapping("/senha")
 	ResponseEntity<Void> trocarSenha(@RequestBody @Valid TrocarSenhaRequest request,
 			@AuthenticationPrincipal Jwt jwt) {
