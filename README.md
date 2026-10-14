@@ -2,7 +2,7 @@
 
 API REST para controle de coletas, cargas (CT-e) e devolução de canhotos (comprovantes de entrega assinados) em uma transportadora, com histórico de status por carga.
 
-**Versão atual: `v0.3.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas e várias NFs agrupadas por CT-e ([ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)). Autenticação ainda não existe; veja o [Roadmap](#roadmap).
+**Versão atual: `v0.3.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas e várias NFs agrupadas por CT-e ([ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)). Toda rota exige login (JWT, perfis ADMIN e OPERADOR; veja [Autenticação](#autenticação)).
 
 ## Modelo de domínio
 
@@ -127,6 +127,28 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 | `GET` | `/notas-fiscais/{id}/canhoto` | Busca o canhoto da NF com o histórico de registros |
 | `POST` | `/notas-fiscais/{id}/canhoto/registros` | Registra o canhoto da NF como `RECEBIDO` ou `DIVERGENTE` |
 
+### Autenticação
+
+Todas as rotas exigem um token JWT, exceto `POST /auth/login`, `/actuator/health` e a documentação (`/swagger-ui.html`, `/v3/api-docs`). Desenho e decisões no [ADR 0002](docs/adr/0002-autenticacao-jwt.md).
+
+```bash
+curl -s -X POST http://localhost:8080/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"login": "admin", "senha": "<ADMIN_SENHA>"}'
+# {"token":"eyJ...","tipo":"Bearer","expiraEm":"2026-10-14T21:00:00Z","perfil":"ADMIN"}
+
+curl -s http://localhost:8080/coletas -H 'Authorization: Bearer eyJ...'
+```
+
+No Swagger, use o botão **Authorize** e cole o token.
+
+| Perfil | Pode |
+|---|---|
+| `OPERADOR` | Coletas, cargas e canhotos: criar, consultar, listar, alterar status e situação, registrar canhoto |
+| `ADMIN` | Tudo do `OPERADOR`, mais corrigir a chave de acesso provisória (`PATCH /cargas/{id}/chave-acesso`) |
+
+Sem token, ou com token inválido ou expirado, a resposta é `401`; com perfil sem permissão, `403`. O token vale `JWT_EXPIRACAO` (1 hora por padrão). Login inexistente, usuário inativo e senha errada respondem igual (`401`, "Login ou senha inválidos").
+
 ### Listagens
 
 Todos os filtros são opcionais e combinados com `E`. Datas no formato `AAAA-MM-DD`.
@@ -181,6 +203,8 @@ Erros seguem o formato `ProblemDetail` (RFC 9457):
 | Status | Quando |
 |---|---|
 | `400` | Dados inválidos (campo a campo em `erros`) |
+| `401` | Sem token, token inválido ou expirado, ou login com credenciais inválidas |
+| `403` | Perfil sem permissão para a operação |
 | `404` | Recurso não encontrado |
 | `409` | Confirmação necessária (`confirmacaoNecessaria: true`) ou violação de integridade |
 | `422` | Regra de negócio violada (ex.: CT-e já cadastrado, NF repetida no mesmo CT-e) |
@@ -201,8 +225,11 @@ Java 21 · Spring Boot 4.1 · Spring Data JPA (Hibernate 7) · PostgreSQL 18 · 
 ```bash
 git clone https://github.com/Ejurevics/API-Controle_Canhotos.git
 cd API-Controle_Canhotos
+cp .env.example .env          # preencha JWT_SECRET e ADMIN_SENHA (veja Configuração)
 docker compose up --build
 ```
+
+Sem `JWT_SECRET` e `ADMIN_SENHA` no `.env`, o `docker compose` não sobe e avisa qual variável falta. Na primeira subida é criado o ADMIN `ADMIN_LOGIN` (padrão `admin`) com a senha `ADMIN_SENHA`; veja [Autenticação](#autenticação).
 
 | O quê | URL |
 |---|---|
@@ -214,7 +241,7 @@ As tabelas são criadas automaticamente pelo Flyway na subida. Para parar: `dock
 
 ### Desenvolvimento local
 
-Sobe só o banco no Docker e roda a aplicação na máquina (perfil `dev`, com SQL no log):
+Sobe só o banco no Docker e roda a aplicação na máquina (perfil `dev`, com SQL no log e valores de desenvolvimento para o JWT e o ADMIN inicial: login `admin`, senha `admin12345`):
 
 ```bash
 docker compose up -d db
@@ -235,7 +262,7 @@ O GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw clean verify` em todo
 
 ## Configuração
 
-Todas as variáveis têm valor padrão, então o projeto sobe sem configurar nada. Para mudar, copie `.env.example` para `.env` e preencha. O `docker compose` lê o `.env` automaticamente.
+Copie `.env.example` para `.env` e preencha. O `docker compose` lê o `.env` automaticamente. `JWT_SECRET` e `ADMIN_SENHA` são obrigatórias no compose; as demais têm valor padrão.
 
 | Variável | Padrão | Uso |
 |---|---|---|
@@ -244,11 +271,16 @@ Todas as variáveis têm valor padrão, então o projeto sobe sem configurar nad
 | `DB_PASSWORD` | `canhotos` | Senha do banco |
 | `DB_PORT` | `5432` | Porta do PostgreSQL exposta na máquina |
 | `APP_PORT` | `8080` | Porta da API exposta na máquina |
+| `JWT_SECRET` | — (obrigatória) | Segredo de assinatura do JWT, com pelo menos 32 caracteres. Gere um com `openssl rand -base64 48` |
+| `JWT_EXPIRACAO` | `PT1H` | Validade do token, em ISO-8601 (`PT1H` = 1 hora) |
+| `ADMIN_LOGIN` | `admin` | Login do primeiro ADMIN, criado na subida se ainda não houver nenhum |
+| `ADMIN_NOME` | `Administrador` | Nome do primeiro ADMIN |
+| `ADMIN_SENHA` | — (obrigatória) | Senha do primeiro ADMIN, com pelo menos 8 caracteres. Ignorada depois que o ADMIN existe |
 
 Perfis Spring:
 
-- `dev` (padrão): aplicação local apontando para `localhost:5432`, com log de SQL.
-- `docker`: usado pelo compose; exige `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` (sem valor padrão, falha rápido se faltar).
+- `dev` (padrão): aplicação local apontando para `localhost:5432`, com log de SQL e valores de desenvolvimento para `JWT_SECRET` e `ADMIN_SENHA` (`admin12345`). Só para a máquina local e os testes.
+- `docker`: usado pelo compose; exige `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` e `JWT_SECRET` (sem valor padrão, falha rápido se faltar).
 
 ## Estrutura
 
@@ -259,6 +291,8 @@ src/main/java/br/com/controlecanhotos/
 ├── notafiscal/    Nota fiscal (de 1 a N por CT-e) e DTOs
 ├── canhoto/       Canhoto (um por NF), status, service, controllers e DTOs
 ├── historico/     Histórico de status da carga e de registros do canhoto
+├── usuario/       Usuário e perfil (ADMIN, OPERADOR)
+├── seguranca/     Login, emissão e validação do JWT, regras de acesso e ADMIN inicial
 └── shared/        Exceções, tratamento global de erros (ApiExceptionHandler) e paginação
 src/main/resources/
 ├── application.yml
@@ -266,6 +300,7 @@ src/main/resources/
 .github/workflows/ci.yml  CI: build e testes a cada PR
 Dockerfile         Build multi-stage (JDK para compilar, JRE para rodar)
 docker-compose.yml App + PostgreSQL com healthcheck
+docs/adr/          Decisões de arquitetura (ADRs)
 ```
 
 ## Fluxo de desenvolvimento
@@ -281,5 +316,6 @@ docker-compose.yml App + PostgreSQL com healthcheck
 - [x] Listagens com filtros e paginação (coletas por situação, cliente e período; cargas por status; canhotos pendentes).
 - [x] Testes de service.
 - [x] Regra para concluir uma coleta com base no status das cargas.
-- [ ] Autenticação.
+- [x] Autenticação com JWT e perfis ADMIN e OPERADOR ([ADR 0002](docs/adr/0002-autenticacao-jwt.md)).
+- [ ] Gestão de usuários pela API (criar, listar, desativar, trocar senha).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
