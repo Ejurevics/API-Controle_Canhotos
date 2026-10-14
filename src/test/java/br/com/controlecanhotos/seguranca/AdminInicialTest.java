@@ -32,7 +32,7 @@ class AdminInicialTest {
 	private AdminInicial adminInicial(String login, String senha) {
 		PropriedadesSeguranca propriedades = new PropriedadesSeguranca(
 				new PropriedadesSeguranca.Jwt("x".repeat(32), Duration.ofHours(1)),
-				new PropriedadesSeguranca.AdminInicial(login, null, senha));
+				new PropriedadesSeguranca.AdminInicial(login, null, senha), null);
 		return new AdminInicial(usuarioRepository, passwordEncoder, propriedades);
 	}
 

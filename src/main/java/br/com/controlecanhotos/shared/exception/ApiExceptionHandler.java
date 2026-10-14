@@ -26,6 +26,13 @@ public class ApiExceptionHandler {
 				.body(ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, detalhe));
 	}
 
+	@ExceptionHandler(TentativasExcedidasException.class)
+	ResponseEntity<ProblemDetail> tentativasExcedidas(TentativasExcedidasException ex) {
+		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+				.header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getEsperaEmSegundos()))
+				.body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage()));
+	}
+
 	@ExceptionHandler(AccessDeniedException.class)
 	ProblemDetail semPermissao(AccessDeniedException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN,

@@ -32,6 +32,11 @@ app:
       login: ${ADMIN_LOGIN:admin}
       nome: ${ADMIN_NOME:Administrador}
       senha: ${ADMIN_SENHA:}
+    # Limite de tentativas de login (ADR 0003): falhas permitidas por login e por IP dentro da janela.
+    login:
+      max-falhas-por-login: ${LOGIN_MAX_FALHAS_POR_LOGIN:5}
+      max-falhas-por-ip: ${LOGIN_MAX_FALHAS_POR_IP:20}
+      janela: ${LOGIN_JANELA:PT15M}
 
 ---
 spring:

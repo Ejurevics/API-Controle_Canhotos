@@ -157,6 +157,8 @@ No Swagger, use o botão **Authorize** e cole o token.
 
 Sem token, ou com token inválido ou expirado, a resposta é `401`; com perfil sem permissão, `403`. O token vale `JWT_EXPIRACAO` (1 hora por padrão). Login inexistente, usuário inativo e senha errada respondem igual (`401`, "Login ou senha inválidos").
 
+Limite de tentativas ([ADR 0003](docs/adr/0003-limite-tentativas-login.md)): 5 falhas de um mesmo login, ou 20 de um mesmo IP, em 15 minutos bloqueiam novas tentativas até a janela acabar. A resposta é `429` com `Retry-After`, e nem a senha certa entra durante o bloqueio. Login certo zera as falhas do login. Os contadores ficam em memória e zeram ao reiniciar a aplicação. Atrás de proxy ou NAT (inclusive o Docker Desktop), vários clientes podem chegar com o mesmo IP; veja o ADR.
+
 #### Gestão de usuários
 
 ```bash
@@ -231,6 +233,7 @@ Erros seguem o formato `ProblemDetail` (RFC 9457):
 | `404` | Recurso não encontrado |
 | `409` | Confirmação necessária (`confirmacaoNecessaria: true`) ou violação de integridade |
 | `422` | Regra de negócio violada (ex.: CT-e já cadastrado, NF repetida no mesmo CT-e) |
+| `429` | Muitas tentativas de login com erro; `Retry-After` diz em quantos segundos tentar de novo |
 
 ## Stack
 
@@ -299,6 +302,9 @@ Copie `.env.example` para `.env` e preencha. O `docker compose` lê o `.env` aut
 | `ADMIN_LOGIN` | `admin` | Login do primeiro ADMIN, criado na subida se ainda não houver nenhum |
 | `ADMIN_NOME` | `Administrador` | Nome do primeiro ADMIN |
 | `ADMIN_SENHA` | — (obrigatória) | Senha do primeiro ADMIN, com pelo menos 8 caracteres. Ignorada depois que o ADMIN existe |
+| `LOGIN_MAX_FALHAS_POR_LOGIN` | `5` | Falhas de login permitidas por login dentro da janela |
+| `LOGIN_MAX_FALHAS_POR_IP` | `20` | Falhas de login permitidas por IP dentro da janela |
+| `LOGIN_JANELA` | `PT15M` | Janela do limite de tentativas, em ISO-8601 (`PT15M` = 15 minutos) |
 
 Perfis Spring:
 
@@ -342,4 +348,5 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Autenticação com JWT e perfis ADMIN e OPERADOR ([ADR 0002](docs/adr/0002-autenticacao-jwt.md)).
 - [x] Gestão de usuários pela API (criar, listar, desativar, trocar senha).
 - [x] Histórico da carga e do canhoto registra o usuário que fez cada mudança.
+- [x] Limite de tentativas de login por login e por IP ([ADR 0003](docs/adr/0003-limite-tentativas-login.md)).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
