@@ -18,7 +18,7 @@ import br.com.controlecanhotos.usuario.UsuarioRepository;
 @Component
 public class AdminInicial implements ApplicationRunner {
 
-	static final int TAMANHO_MINIMO_SENHA = 8;
+	static final int TAMANHO_MINIMO_SENHA = Usuario.TAMANHO_MINIMO_SENHA;
 
 	private static final Logger LOG = LoggerFactory.getLogger(AdminInicial.class);
 
