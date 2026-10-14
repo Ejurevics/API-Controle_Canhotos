@@ -3,6 +3,7 @@ package br.com.controlecanhotos.carga;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -133,7 +134,7 @@ class CargaServiceTest {
 		when(cargaRepository.findAll(any(Specification.class), any(Pageable.class)))
 				.thenAnswer(i -> new PageImpl<>(List.of(novaCarga()), i.getArgument(1), 1));
 
-		var pagina = service.listar(StatusCarga.AGUARDANDO_COLETA, 7L, 1, 5);
+		var pagina = service.listar(StatusCarga.AGUARDANDO_COLETA, 7L, null, 1, 5);
 
 		ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
 		verify(cargaRepository).findAll(any(Specification.class), captor.capture());
@@ -149,9 +150,51 @@ class CargaServiceTest {
 
 	@Test
 	void rejeitaPaginacaoForaDoLimiteSemConsultarOBanco() {
-		assertThatThrownBy(() -> service.listar(null, null, 0, 101))
+		assertThatThrownBy(() -> service.listar(null, null, null, 0, 101))
 				.isInstanceOf(RegraNegocioException.class);
 
 		verifyNoInteractions(cargaRepository);
+	}
+
+	@Test
+	void corrigeChaveProvisoria() {
+		when(cargaRepository.findById(1L)).thenReturn(Optional.of(CargaTest.cargaMigrada()));
+
+		CargaDetalheResponse resposta = service.corrigirChaveAcesso(1L, Cte.chave(7));
+
+		assertThat(resposta.chaveAcesso()).isEqualTo(Cte.chave(7));
+		assertThat(resposta.chaveProvisoria()).isFalse();
+	}
+
+	@Test
+	void naoCorrigeParaChaveDeOutroCte() {
+		Carga carga = CargaTest.cargaMigrada();
+		String chaveOriginal = carga.getChaveAcesso();
+		when(cargaRepository.findById(1L)).thenReturn(Optional.of(carga));
+		when(cargaRepository.existsByChaveAcesso(Cte.chave(7))).thenReturn(true);
+
+		assertThatThrownBy(() -> service.corrigirChaveAcesso(1L, Cte.chave(7)))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessageContaining("CT-e já cadastrado");
+		assertThat(carga.getChaveAcesso()).isEqualTo(chaveOriginal);
+		assertThat(carga.isChaveProvisoria()).isTrue();
+	}
+
+	@Test
+	void naoCorrigeChaveDefinitivaNemConsultaDuplicidade() {
+		when(cargaRepository.findById(1L)).thenReturn(Optional.of(novaCarga()));
+
+		assertThatThrownBy(() -> service.corrigirChaveAcesso(1L, Cte.chave(7)))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessageContaining("já é definitiva");
+		verify(cargaRepository, never()).existsByChaveAcesso(any());
+	}
+
+	@Test
+	void corrigirChaveDeCargaInexistenteLancaNaoEncontrado() {
+		when(cargaRepository.findById(99L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.corrigirChaveAcesso(99L, Cte.chave(7)))
+				.isInstanceOf(RecursoNaoEncontradoException.class);
 	}
 }

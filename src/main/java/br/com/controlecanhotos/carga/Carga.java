@@ -120,6 +120,17 @@ public class Carga {
 		status = novoStatus;
 	}
 
+	/** Troca a chave provisória (de cargas migradas antes do CT-e) pela chave real, que passa a ser definitiva. */
+	public void corrigirChaveAcesso(String novaChave) {
+		if (!chaveProvisoria) {
+			throw new RegraNegocioException(
+					"Só a chave de acesso provisória pode ser corrigida; a do CT-e %s já é definitiva"
+							.formatted(chaveAcesso));
+		}
+		chaveAcesso = novaChave;
+		chaveProvisoria = false;
+	}
+
 	public BigDecimal getPesoTotalKg() {
 		return notasFiscais.stream().map(NotaFiscal::getPesoKg).reduce(BigDecimal.ZERO, BigDecimal::add);
 	}
