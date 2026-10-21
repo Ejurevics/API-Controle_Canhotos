@@ -4,46 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.Test;
 
+import br.com.controlecanhotos.RelogioManual;
 import br.com.controlecanhotos.shared.exception.TentativasExcedidasException;
 
 class LimiteTentativasLoginTest {
 
 	private static final String IP = "10.0.0.1";
 
-	/** Relógio que o teste avança à mão. */
-	private static final class Relogio extends Clock {
-
-		private Instant agora = Instant.parse("2026-10-14T12:00:00Z");
-
-		void avancar(Duration duracao) {
-			agora = agora.plus(duracao);
-		}
-
-		@Override
-		public Instant instant() {
-			return agora;
-		}
-
-		@Override
-		public ZoneId getZone() {
-			return ZoneOffset.UTC;
-		}
-
-		@Override
-		public Clock withZone(ZoneId zone) {
-			return this;
-		}
-	}
-
-	private final Relogio relogio = new Relogio();
+	private final RelogioManual relogio = new RelogioManual();
 
 	/** 3 falhas por login, 5 por IP, janela de 15 minutos. */
 	private final LimiteTentativasLogin limite = new LimiteTentativasLogin(

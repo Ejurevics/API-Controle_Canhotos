@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import br.com.controlecanhotos.seguranca.CacheCredenciais;
 import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import br.com.controlecanhotos.usuario.dto.CriarUsuarioRequest;
@@ -31,11 +32,14 @@ class UsuarioServiceTest {
 	@Mock
 	private PasswordEncoder passwordEncoder;
 
+	@Mock
+	private CacheCredenciais cacheCredenciais;
+
 	private UsuarioService service;
 
 	@BeforeEach
 	void criarService() {
-		service = new UsuarioService(usuarioRepository, passwordEncoder);
+		service = new UsuarioService(usuarioRepository, passwordEncoder, cacheCredenciais);
 	}
 
 	private static Usuario usuario(String login, Perfil perfil) {
@@ -97,6 +101,7 @@ class UsuarioServiceTest {
 		assertThat(operador.getVersaoCredencial()).as("desativar derruba os tokens").isEqualTo(1);
 		assertThat(service.alterarAtivo(1L, true, "admin").ativo()).isTrue();
 		assertThat(operador.getVersaoCredencial()).as("reativar não devolve os tokens").isEqualTo(1);
+		verify(cacheCredenciais, org.mockito.Mockito.times(2)).invalidar("operador");
 	}
 
 	@Test

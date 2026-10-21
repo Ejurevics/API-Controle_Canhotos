@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +29,7 @@ class ValidadorCredencialAtualTest {
 
 	@BeforeEach
 	void criarValidador() {
-		validador = new ValidadorCredencialAtual(usuarioRepository);
+		validador = new ValidadorCredencialAtual(usuarioRepository, new CacheCredenciais(Duration.ZERO, Clock.systemUTC()));
 	}
 
 	private static Jwt token(Object versao) {

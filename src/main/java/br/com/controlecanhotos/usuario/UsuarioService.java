@@ -10,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.com.controlecanhotos.seguranca.CacheCredenciais;
 import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
@@ -22,10 +23,13 @@ public class UsuarioService {
 
 	private final UsuarioRepository usuarioRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final CacheCredenciais cacheCredenciais;
 
-	public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+	public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder,
+			CacheCredenciais cacheCredenciais) {
 		this.usuarioRepository = usuarioRepository;
 		this.passwordEncoder = passwordEncoder;
+		this.cacheCredenciais = cacheCredenciais;
 	}
 
 	@Transactional
@@ -72,6 +76,8 @@ public class UsuarioService {
 		} else {
 			usuario.desativar();
 		}
+		// Também ao reativar: um "inativo" guardado recusaria o token novo até vencer.
+		cacheCredenciais.invalidar(usuario.getLogin());
 		return UsuarioResponse.de(usuario);
 	}
 
@@ -88,6 +94,7 @@ public class UsuarioService {
 				exigirOutroAdminAtivo(usuario, "rebaixar");
 			}
 			usuario.alterarPerfil(perfil);
+			cacheCredenciais.invalidar(usuario.getLogin());
 		}
 		return UsuarioResponse.de(usuario);
 	}
@@ -111,7 +118,9 @@ public class UsuarioService {
 	/** ADMIN define uma nova senha para outro usuário (por exemplo, quando ele a esqueceu). */
 	@Transactional
 	public void redefinirSenha(Long id, String novaSenha) {
-		encontrar(id).redefinirSenha(codificar(novaSenha));
+		Usuario usuario = encontrar(id);
+		usuario.redefinirSenha(codificar(novaSenha));
+		cacheCredenciais.invalidar(usuario.getLogin());
 	}
 
 	/** O próprio usuário troca a senha, confirmando a atual. */
@@ -124,6 +133,7 @@ public class UsuarioService {
 			throw new RegraNegocioException("Senha atual incorreta");
 		}
 		usuario.trocarSenha(codificar(novaSenha));
+		cacheCredenciais.invalidar(usuario.getLogin());
 	}
 
 	private Usuario encontrar(Long id) {
