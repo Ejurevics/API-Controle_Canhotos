@@ -264,6 +264,11 @@ class SegurancaTest {
 		mvc.perform(get("/coletas").header(HttpHeaders.AUTHORIZATION, bearer(token)))
 				.andExpect(status().isUnauthorized());
 		entrar("troca-senha", "senha-nova-12");
+
+		long id = usuarios.findByLogin("troca-senha").orElseThrow().getId();
+		mvc.perform(get("/usuarios/{id}", id).header(HttpHeaders.AUTHORIZATION, bearer(entrar("admin", "admin12345"))))
+				.andExpect(jsonPath("$.historico[-1:].acao").value(org.hamcrest.Matchers.contains("SENHA_TROCADA")))
+				.andExpect(jsonPath("$.historico[-1:].alteradoPor").value(org.hamcrest.Matchers.contains("troca-senha")));
 	}
 
 	@Test

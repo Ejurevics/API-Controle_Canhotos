@@ -14,6 +14,7 @@ import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import br.com.controlecanhotos.shared.paginacao.ParametrosListagem;
 import br.com.controlecanhotos.usuario.dto.CriarUsuarioRequest;
+import br.com.controlecanhotos.usuario.dto.UsuarioDetalheResponse;
 import br.com.controlecanhotos.usuario.dto.UsuarioResponse;
 
 @Service
@@ -38,8 +39,8 @@ public class UsuarioService {
 	}
 
 	@Transactional(readOnly = true)
-	public UsuarioResponse buscar(Long id) {
-		return UsuarioResponse.de(encontrar(id));
+	public UsuarioDetalheResponse buscar(Long id) {
+		return UsuarioDetalheResponse.de(encontrar(id));
 	}
 
 	@Transactional(readOnly = true)
@@ -110,7 +111,7 @@ public class UsuarioService {
 	/** ADMIN define uma nova senha para outro usuário (por exemplo, quando ele a esqueceu). */
 	@Transactional
 	public void redefinirSenha(Long id, String novaSenha) {
-		encontrar(id).alterarSenha(codificar(novaSenha));
+		encontrar(id).redefinirSenha(codificar(novaSenha));
 	}
 
 	/** O próprio usuário troca a senha, confirmando a atual. */
@@ -122,7 +123,7 @@ public class UsuarioService {
 		if (!passwordEncoder.matches(senhaAtual, usuario.getSenhaHash())) {
 			throw new RegraNegocioException("Senha atual incorreta");
 		}
-		usuario.alterarSenha(codificar(novaSenha));
+		usuario.trocarSenha(codificar(novaSenha));
 	}
 
 	private Usuario encontrar(Long id) {
