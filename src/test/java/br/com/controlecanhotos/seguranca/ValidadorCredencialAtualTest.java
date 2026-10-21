@@ -52,7 +52,7 @@ class ValidadorCredencialAtualTest {
 	@Test
 	void recusaTokenEmitidoAntesDaTrocaDeSenha() {
 		Usuario maria = maria();
-		maria.alterarSenha("hash-novo");
+		maria.redefinirSenha("hash-novo");
 		when(usuarioRepository.findByLogin("maria")).thenReturn(Optional.of(maria));
 
 		assertThat(validador.validate(token(0L)).hasErrors()).isTrue();

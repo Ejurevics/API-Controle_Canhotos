@@ -20,6 +20,7 @@ import br.com.controlecanhotos.usuario.dto.AlterarAtivoRequest;
 import br.com.controlecanhotos.usuario.dto.AlterarPerfilRequest;
 import br.com.controlecanhotos.usuario.dto.CriarUsuarioRequest;
 import br.com.controlecanhotos.usuario.dto.RedefinirSenhaRequest;
+import br.com.controlecanhotos.usuario.dto.UsuarioDetalheResponse;
 import br.com.controlecanhotos.usuario.dto.UsuarioResponse;
 import jakarta.validation.Valid;
 
@@ -50,7 +51,7 @@ public class UsuarioController {
 	}
 
 	@GetMapping("/{id}")
-	UsuarioResponse buscar(@PathVariable Long id) {
+	UsuarioDetalheResponse buscar(@PathVariable Long id) {
 		return service.buscar(id);
 	}
 
