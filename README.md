@@ -131,7 +131,7 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 | `PATCH` | `/auth/senha` | O usuário logado troca a própria senha (`{"senhaAtual": "...", "novaSenha": "..."}`, `204`) |
 | `POST` | `/usuarios` | Cria um usuário (`{"login", "nome", "senha", "perfil"}`, `201` + `Location`). Só ADMIN |
 | `GET` | `/usuarios` | Lista usuários com filtros e paginação. Só ADMIN |
-| `GET` | `/usuarios/{id}` | Busca um usuário. Só ADMIN |
+| `GET` | `/usuarios/{id}` | Busca um usuário, com o histórico da gestão. Só ADMIN |
 | `PATCH` | `/usuarios/{id}/ativo` | Desativa ou reativa um usuário (`{"ativo": false}`). Só ADMIN |
 | `PATCH` | `/usuarios/{id}/perfil` | Altera o perfil do usuário (`{"perfil": "ADMIN"}`). Só ADMIN |
 | `PATCH` | `/usuarios/{id}/senha` | Define uma nova senha para o usuário (`{"novaSenha": "..."}`, `204`). Só ADMIN |
@@ -171,6 +171,7 @@ curl -s -X POST http://localhost:8080/usuarios \
 - Login: de 3 a 50 caracteres (letras, números, `.`, `-` e `_`), guardado em minúsculas e sem espaços nas pontas; repetido responde `422`.
 - Senha: de 8 a 72 caracteres e no máximo 72 bytes em UTF-8 (limite do BCrypt). A resposta nunca traz a senha nem o hash.
 - Usuários não são apagados, só desativados: usuário inativo não entra. Ninguém desativa o próprio usuário, e o último ADMIN ativo não pode ser desativado (`422`).
+- Histórico (`historico` em `GET /usuarios/{id}`): cada ação da gestão fica registrada com quando e quem a fez: `CRIADO`, `DESATIVADO`, `REATIVADO`, `PERFIL_ALTERADO` (com `detalhe`, ex.: `OPERADOR → ADMIN`), `SENHA_REDEFINIDA` (pelo ADMIN) e `SENHA_TROCADA` (pelo próprio usuário). Pedidos que não mudam nada (desativar quem já está inativo, o mesmo perfil) não entram. O ADMIN inicial e os usuários anteriores à v0.6.0 ficam com o registro de criação sem autor.
 - Perfil: ninguém altera o próprio, e o último ADMIN ativo não pode virar OPERADOR (`422`). A troca derruba os tokens do usuário, que entra de novo já com o perfil novo; pedir o perfil que ele já tem não muda nada.
 - Trocar a senha (`PATCH /auth/senha`) exige a senha atual; errada responde `422`.
 - Desativar o usuário ou trocar a senha (pelo próprio usuário ou pelo ADMIN) derruba na hora todos os tokens já emitidos para ele, inclusive o usado na troca: é preciso entrar de novo. Reativar não devolve os tokens antigos ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
@@ -354,4 +355,5 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Revogar os tokens de quem é desativado ou troca a senha ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
 - [x] Alterar o perfil de um usuário.
 - [x] Histórico de situação da coleta e registro da correção da chave provisória, com o usuário.
+- [x] Histórico da gestão de usuários (quem criou, desativou, reativou, mudou o perfil ou a senha).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
