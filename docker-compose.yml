@@ -27,6 +27,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-canhotos}
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env (veja .env.example)}
       JWT_EXPIRACAO: ${JWT_EXPIRACAO:-PT1H}
+      JWT_CACHE_CREDENCIAL: ${JWT_CACHE_CREDENCIAL:-PT30S}
       ADMIN_LOGIN: ${ADMIN_LOGIN:-admin}
       ADMIN_NOME: ${ADMIN_NOME:-Administrador}
       ADMIN_SENHA: ${ADMIN_SENHA:?defina ADMIN_SENHA no .env (veja .env.example)}

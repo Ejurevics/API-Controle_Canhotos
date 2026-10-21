@@ -11,7 +11,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("app.seguranca")
 public record PropriedadesSeguranca(Jwt jwt, AdminInicial adminInicial, Login login) {
 
-	public record Jwt(String segredo, Duration expiracao) {
+	/** {@code cacheCredencial}: por quanto tempo a checagem do token reaproveita a credencial lida (ADR 0005). */
+	public record Jwt(String segredo, Duration expiracao, Duration cacheCredencial) {
 	}
 
 	public record AdminInicial(String login, String nome, String senha) {

@@ -13,7 +13,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class SegurancaConfigTest {
 
 	private static PropriedadesSeguranca comSegredo(String segredo) {
-		return new PropriedadesSeguranca(new PropriedadesSeguranca.Jwt(segredo, Duration.ofHours(1)), null, null);
+		return new PropriedadesSeguranca(new PropriedadesSeguranca.Jwt(segredo, Duration.ofHours(1), null), null, null);
 	}
 
 	@ParameterizedTest
