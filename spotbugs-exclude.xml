@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Exclusões do SpotBugs. Cada uma precisa de justificativa; o resto do código é analisado com threshold Low. -->
+<FindBugsFilter
+		xmlns="https://github.com/spotbugs/filter/3.0.0"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/3.1.0/spotbugs/etc/findbugsfilter.xsd">
+
+	<!--
+		DTOs são records de transporte: criados por requisição, lidos pelo Jackson e descartados, sem estado
+		compartilhado. Copiar as listas (List.copyOf) nos *Request trocaria o 400 da Bean Validation (@NotEmpty)
+		por NullPointerException quando a lista vem ausente.
+	-->
+	<Match>
+		<Package name="~br\.com\.controlecanhotos\..*\.dto(\..*)?"/>
+		<Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+	</Match>
+
+	<!-- HttpSecurity.build() declara "throws Exception"; a assinatura do @Bean vem da API do Spring Security. -->
+	<Match>
+		<Class name="br.com.controlecanhotos.seguranca.SegurancaConfig"/>
+		<Method name="filtros"/>
+		<Bug pattern="THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION"/>
+	</Match>
+</FindBugsFilter>
