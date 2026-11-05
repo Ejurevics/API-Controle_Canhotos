@@ -13,6 +13,7 @@ import br.com.controlecanhotos.usuario.UsuarioRepository;
 
 /**
  * Aceita o token só se o usuário ainda existe, está ativo e a versão da credencial no token é a atual (ADR 0004).
+ * Token sem login ({@code sub}) ou sem versão é recusado sem consultar nada.
  * Desativar o usuário ou trocar a senha muda a versão e derruba os tokens emitidos antes. A credencial vem do
  * {@link CacheCredenciais} (ADR 0005), para não consultar o banco a cada requisição.
  */
@@ -33,10 +34,11 @@ public class ValidadorCredencialAtual implements OAuth2TokenValidator<Jwt> {
 	@Override
 	public OAuth2TokenValidatorResult validate(Jwt jwt) {
 		Object versao = jwt.getClaim(SegurancaConfig.CLAIM_VERSAO_CREDENCIAL);
-		if (!(versao instanceof Number numero)) {
+		String login = jwt.getSubject();
+		if (!(versao instanceof Number numero) || login == null) {
 			return REVOGADO;
 		}
-		boolean valido = cache.obter(jwt.getSubject(), this::carregar)
+		boolean valido = cache.obter(login, this::carregar)
 				.filter(CacheCredenciais.Credencial::ativo)
 				.filter(credencial -> credencial.versao() == numero.longValue())
 				.isPresent();
