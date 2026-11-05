@@ -19,10 +19,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * Roda a V7 (histórico de situação da coleta) e a V8 (correção da chave) sobre dados criados no esquema da V6,
- * como num banco já em uso. Usa um banco só dele: a migração acontece uma vez, em {@link #migrar()}.
+ * Roda a V7 (histórico de situação da coleta), a V8 (correção da chave) e a V9 (histórico de usuário) sobre dados
+ * criados no esquema da V6, como num banco já em uso. Usa um banco só dele: a migração acontece uma vez, em
+ * {@link #migrar()}.
  */
-class MigracaoHistoricoColetaTest {
+class MigracaoHistoricosTest {
 
 	private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(
 			DockerImageName.parse("postgres:18-alpine"));
@@ -30,6 +31,7 @@ class MigracaoHistoricoColetaTest {
 	private static long programada;
 	private static long emAndamento;
 	private static long carga;
+	private static long usuario;
 
 	@BeforeAll
 	static void migrar() throws SQLException {
@@ -43,6 +45,9 @@ class MigracaoHistoricoColetaTest {
 					INSERT INTO carga (coleta_id, chave_acesso, chave_provisoria, cidade_destino, uf_destino, status)
 					VALUES (%d, '99' || lpad('1', 42, '0'), TRUE, 'Campinas', 'SP', 'EM_TRANSITO') RETURNING id"""
 					.formatted(programada));
+			usuario = inserir(conexao, """
+					INSERT INTO usuario (login, nome, senha_hash, perfil, ativo, criado_em)
+					VALUES ('maria', 'Maria', 'hash', 'OPERADOR', FALSE, '2026-10-02T09:00:00Z') RETURNING id""");
 		}
 
 		flyway(null).migrate();
@@ -105,6 +110,14 @@ class MigracaoHistoricoColetaTest {
 				.containsExactly(
 						programada + "|null|PROGRAMADA|2026-10-01 10:00:00|null",
 						emAndamento + "|null|EM_ANDAMENTO|2026-10-03 15:30:00|null");
+	}
+
+	@Test
+	void cadaUsuarioGanhaSoORegistroDeCriacaoSemAutor() throws SQLException {
+		assertThat(consultar("""
+				SELECT acao, detalhe, alterado_em AT TIME ZONE 'UTC', alterado_por
+				FROM historico_usuario WHERE usuario_id = %d""".formatted(usuario)))
+				.containsExactly("CRIADO|null|2026-10-02 09:00:00|null");
 	}
 
 	@Test

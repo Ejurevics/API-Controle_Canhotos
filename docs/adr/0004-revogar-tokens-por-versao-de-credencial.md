@@ -20,7 +20,7 @@ O [ADR 0002](0002-autenticacao-jwt.md) aceitou, como risco, que o token não fos
 
 - **Positivas:** desligar alguém ou trocar uma senha vazada corta o acesso na hora, sem esperar a expiração; tudo com uma coluna e sem armazenamento novo.
 - **Negativas:**
-  - Uma consulta ao banco por requisição autenticada (busca pela chave única do login). Aceitável no volume do projeto; se pesar, cabe um cache curto.
+  - Uma consulta ao banco por requisição autenticada (busca pela chave única do login). Aceitável no volume do projeto; se pesar, cabe um cache curto. Adotado depois no [ADR 0005](0005-cache-curto-da-credencial.md).
   - Não dá para derrubar um token específico, só todos os do usuário.
   - Quem troca a própria senha precisa entrar de novo.
 

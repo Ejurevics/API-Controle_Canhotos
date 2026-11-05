@@ -28,6 +28,8 @@ app:
       # HS256: pelo menos 32 bytes. Sem valor padrão fora do perfil dev.
       segredo: ${JWT_SECRET:}
       expiracao: ${JWT_EXPIRACAO:PT1H}
+      # Quanto tempo a checagem do token reaproveita ativo/versão do usuário (ADR 0005); PT0S desliga.
+      cache-credencial: ${JWT_CACHE_CREDENCIAL:PT30S}
     admin-inicial:
       login: ${ADMIN_LOGIN:admin}
       nome: ${ADMIN_NOME:Administrador}

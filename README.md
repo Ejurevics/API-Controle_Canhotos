@@ -2,7 +2,7 @@
 
 API REST para controle de coletas, cargas (CT-e) e devolução de canhotos (comprovantes de entrega assinados) em uma transportadora, com histórico de status por carga.
 
-**Versão atual: `v0.5.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas e várias NFs agrupadas por CT-e ([ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)), com validação da chave de acesso. Toda rota exige login (JWT, perfis ADMIN e OPERADOR, com gestão de usuários pela API, limite de tentativas e revogação de tokens; veja [Autenticação](#autenticação)), e os históricos registram quem fez cada mudança.
+**Versão atual: `v0.6.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas e várias NFs agrupadas por CT-e ([ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)), com validação da chave de acesso. Toda rota exige login (JWT, perfis ADMIN e OPERADOR, com gestão de usuários pela API, limite de tentativas, revogação de tokens e histórico da gestão; veja [Autenticação](#autenticação)), e os históricos registram quem fez cada mudança.
 
 ## Modelo de domínio
 
@@ -131,7 +131,7 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 | `PATCH` | `/auth/senha` | O usuário logado troca a própria senha (`{"senhaAtual": "...", "novaSenha": "..."}`, `204`) |
 | `POST` | `/usuarios` | Cria um usuário (`{"login", "nome", "senha", "perfil"}`, `201` + `Location`). Só ADMIN |
 | `GET` | `/usuarios` | Lista usuários com filtros e paginação. Só ADMIN |
-| `GET` | `/usuarios/{id}` | Busca um usuário. Só ADMIN |
+| `GET` | `/usuarios/{id}` | Busca um usuário, com o histórico da gestão. Só ADMIN |
 | `PATCH` | `/usuarios/{id}/ativo` | Desativa ou reativa um usuário (`{"ativo": false}`). Só ADMIN |
 | `PATCH` | `/usuarios/{id}/perfil` | Altera o perfil do usuário (`{"perfil": "ADMIN"}`). Só ADMIN |
 | `PATCH` | `/usuarios/{id}/senha` | Define uma nova senha para o usuário (`{"novaSenha": "..."}`, `204`). Só ADMIN |
@@ -171,9 +171,10 @@ curl -s -X POST http://localhost:8080/usuarios \
 - Login: de 3 a 50 caracteres (letras, números, `.`, `-` e `_`), guardado em minúsculas e sem espaços nas pontas; repetido responde `422`.
 - Senha: de 8 a 72 caracteres e no máximo 72 bytes em UTF-8 (limite do BCrypt). A resposta nunca traz a senha nem o hash.
 - Usuários não são apagados, só desativados: usuário inativo não entra. Ninguém desativa o próprio usuário, e o último ADMIN ativo não pode ser desativado (`422`).
+- Histórico (`historico` em `GET /usuarios/{id}`): cada ação da gestão fica registrada com quando e quem a fez: `CRIADO`, `DESATIVADO`, `REATIVADO`, `PERFIL_ALTERADO` (com `detalhe`, ex.: `OPERADOR → ADMIN`), `SENHA_REDEFINIDA` (pelo ADMIN) e `SENHA_TROCADA` (pelo próprio usuário). Pedidos que não mudam nada (desativar quem já está inativo, o mesmo perfil) não entram. O ADMIN inicial e os usuários anteriores à v0.6.0 ficam com o registro de criação sem autor.
 - Perfil: ninguém altera o próprio, e o último ADMIN ativo não pode virar OPERADOR (`422`). A troca derruba os tokens do usuário, que entra de novo já com o perfil novo; pedir o perfil que ele já tem não muda nada.
 - Trocar a senha (`PATCH /auth/senha`) exige a senha atual; errada responde `422`.
-- Desativar o usuário ou trocar a senha (pelo próprio usuário ou pelo ADMIN) derruba na hora todos os tokens já emitidos para ele, inclusive o usado na troca: é preciso entrar de novo. Reativar não devolve os tokens antigos ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
+- Desativar o usuário ou trocar a senha (pelo próprio usuário ou pelo ADMIN) derruba na hora todos os tokens já emitidos para ele, inclusive o usado na troca: é preciso entrar de novo. Reativar não devolve os tokens antigos ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)). A checagem reaproveita por até `JWT_CACHE_CREDENCIAL` (30 s) o que leu do usuário, e essas operações limpam o cache na hora; só mudanças feitas direto no banco esperam o prazo ([ADR 0005](docs/adr/0005-cache-curto-da-credencial.md)).
 
 ### Listagens
 
@@ -301,6 +302,7 @@ Copie `.env.example` para `.env` e preencha. O `docker compose` lê o `.env` aut
 | `APP_PORT` | `8080` | Porta da API exposta na máquina |
 | `JWT_SECRET` | — (obrigatória) | Segredo de assinatura do JWT, com pelo menos 32 caracteres. Gere um com `openssl rand -base64 48` |
 | `JWT_EXPIRACAO` | `PT1H` | Validade do token, em ISO-8601 (`PT1H` = 1 hora) |
+| `JWT_CACHE_CREDENCIAL` | `PT30S` | Por quanto tempo a checagem do token reaproveita se o usuário está ativo e a versão da credencial; `PT0S` desliga |
 | `ADMIN_LOGIN` | `admin` | Login do primeiro ADMIN, criado na subida se ainda não houver nenhum |
 | `ADMIN_NOME` | `Administrador` | Nome do primeiro ADMIN |
 | `ADMIN_SENHA` | — (obrigatória) | Senha do primeiro ADMIN, com pelo menos 8 caracteres. Ignorada depois que o ADMIN existe |
@@ -336,7 +338,7 @@ docs/adr/          Decisões de arquitetura (ADRs)
 
 ## Fluxo de desenvolvimento
 
-- `main`: versões estáveis, marcadas com tag (`v0.5.0`). Só recebe a `develop` via PR de release, com merge commit.
+- `main`: versões estáveis, marcadas com tag (`v0.6.0`). Só recebe a `develop` via PR de release, com merge commit.
 - `develop`: integração. Recebe os PRs de feature, com squash.
 - Branches de trabalho nascem da `develop` (`feat/`, `fix/`, `chore/`, `docs/`, `refactor/`) e são apagadas após o merge.
 - Commits seguem Conventional Commits (`feat(coleta): adiciona ...`).
@@ -354,4 +356,6 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Revogar os tokens de quem é desativado ou troca a senha ([ADR 0004](docs/adr/0004-revogar-tokens-por-versao-de-credencial.md)).
 - [x] Alterar o perfil de um usuário.
 - [x] Histórico de situação da coleta e registro da correção da chave provisória, com o usuário.
+- [x] Histórico da gestão de usuários (quem criou, desativou, reativou, mudou o perfil ou a senha).
+- [x] Cache curto da credencial na checagem do token ([ADR 0005](docs/adr/0005-cache-curto-da-credencial.md)).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).

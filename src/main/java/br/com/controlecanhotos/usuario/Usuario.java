@@ -1,10 +1,16 @@
 package br.com.controlecanhotos.usuario;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import br.com.controlecanhotos.historico.HistoricoUsuario;
+import br.com.controlecanhotos.historico.HistoricoUsuario.Acao;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -12,6 +18,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 
 @Entity
 public class Usuario {
@@ -46,6 +54,10 @@ public class Usuario {
 	@UpdateTimestamp
 	private OffsetDateTime atualizadoEm;
 
+	@OneToMany(mappedBy = "usuario", cascade = CascadeType.ALL)
+	@OrderBy("alteradoEm, id")
+	private List<HistoricoUsuario> historico = new ArrayList<>();
+
 	protected Usuario() {
 	}
 
@@ -56,6 +68,7 @@ public class Usuario {
 		this.senhaHash = senhaHash;
 		this.perfil = perfil;
 		this.ativo = true;
+		registrar(Acao.CRIADO, null);
 	}
 
 	/** Login é guardado e comparado sem espaços nas pontas e em minúsculas. */
@@ -63,28 +76,50 @@ public class Usuario {
 		return login == null ? null : login.strip().toLowerCase();
 	}
 
-	/** Também invalida os tokens já emitidos; reativar não os devolve. */
+	/** Também invalida os tokens já emitidos; reativar não os devolve. Já inativo, não muda nada. */
 	public void desativar() {
-		ativo = false;
-		invalidarTokens();
+		if (ativo) {
+			ativo = false;
+			invalidarTokens();
+			registrar(Acao.DESATIVADO, null);
+		}
 	}
 
+	/** Já ativo, não muda nada. */
 	public void ativar() {
-		ativo = true;
+		if (!ativo) {
+			ativo = true;
+			registrar(Acao.REATIVADO, null);
+		}
 	}
 
-	/** {@code senhaHash} já vem codificada (BCrypt). Invalida os tokens já emitidos, inclusive o atual. */
-	public void alterarSenha(String senhaHash) {
-		this.senhaHash = senhaHash;
-		invalidarTokens();
+	/** O ADMIN define uma senha nova. {@code senhaHash} já vem codificada (BCrypt). Invalida os tokens já emitidos. */
+	public void redefinirSenha(String senhaHash) {
+		alterarSenha(senhaHash, Acao.SENHA_REDEFINIDA);
+	}
+
+	/** O próprio usuário troca a senha. Invalida os tokens já emitidos, inclusive o atual. */
+	public void trocarSenha(String senhaHash) {
+		alterarSenha(senhaHash, Acao.SENHA_TROCADA);
 	}
 
 	/** Invalida os tokens já emitidos, que levam o perfil antigo; o mesmo perfil não muda nada. */
 	public void alterarPerfil(Perfil novoPerfil) {
 		if (novoPerfil != perfil) {
+			registrar(Acao.PERFIL_ALTERADO, perfil + " → " + novoPerfil);
 			perfil = novoPerfil;
 			invalidarTokens();
 		}
+	}
+
+	private void alterarSenha(String senhaHash, Acao acao) {
+		this.senhaHash = senhaHash;
+		invalidarTokens();
+		registrar(acao, null);
+	}
+
+	private void registrar(Acao acao, String detalhe) {
+		historico.add(new HistoricoUsuario(this, acao, detalhe));
 	}
 
 	private void invalidarTokens() {
@@ -125,5 +160,9 @@ public class Usuario {
 
 	public OffsetDateTime getAtualizadoEm() {
 		return atualizadoEm;
+	}
+
+	public List<HistoricoUsuario> getHistorico() {
+		return Collections.unmodifiableList(historico);
 	}
 }

@@ -107,6 +107,29 @@ class UsuarioControllerTest {
 	}
 
 	@Test
+	void historicoRegistraQuemFezCadaAcaoDaGestao() throws Exception {
+		long id = criar(novoLogin(), "OPERADOR");
+
+		mvc.perform(patch("/usuarios/{id}/perfil", id).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"perfil\": \"ADMIN\"}")).andExpect(status().isOk());
+		mvc.perform(patch("/usuarios/{id}/senha", id).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"novaSenha\": \"senha-redefinida-1\"}")).andExpect(status().isNoContent());
+		mvc.perform(patch("/usuarios/{id}/ativo", id).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"ativo\": false}")).andExpect(status().isOk());
+
+		mvc.perform(get("/usuarios/{id}", id))
+				.andExpect(jsonPath("$.historico[*].acao").value(org.hamcrest.Matchers.contains(
+						"CRIADO", "PERFIL_ALTERADO", "SENHA_REDEFINIDA", "DESATIVADO")))
+				.andExpect(jsonPath("$.historico[1].detalhe").value("OPERADOR → ADMIN"))
+				.andExpect(jsonPath("$.historico[*].alteradoPor").value(org.hamcrest.Matchers.everyItem(
+						org.hamcrest.Matchers.is(AutenticadoComoAdmin.LOGIN))))
+				.andExpect(jsonPath("$.historico[0].alteradoEm").exists());
+
+		mvc.perform(get("/usuarios").param("tamanho", "1"))
+				.andExpect(jsonPath("$.content[0].historico").doesNotExist());
+	}
+
+	@Test
 	void desativaEFiltraAListagemPorPerfilEAtivo() throws Exception {
 		String login = novoLogin();
 		long id = criar(login, "OPERADOR");
