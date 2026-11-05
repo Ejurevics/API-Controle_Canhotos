@@ -287,7 +287,9 @@ Com o Docker rodando:
 
 Os testes de integração sobem um PostgreSQL descartável via Testcontainers.
 
-O GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw clean verify` em todo PR e push para `develop` e `main` e, nos PRs, barra dependência nova ou atualizada com vulnerabilidade conhecida de gravidade moderada ou maior (`dependency-review-action`). O CodeQL (`.github/workflows/codeql.yml`) procura falhas de segurança no Java e nos workflows a cada PR, push e toda segunda-feira; os achados ficam na aba **Security**. As actions ficam fixadas pelo SHA do commit, com a versão em comentário, e o Dependabot (`.github/dependabot.yml`) abre toda segunda-feira PRs para a `develop` atualizando as dependências do Maven e as actions.
+O `./mvnw verify` mede a cobertura com o JaCoCo (relatório em `target/site/jacoco/index.html`) e falha se ela ficar abaixo de 95% das linhas ou 90% dos branches (propriedades `jacoco.minimo.linhas` e `jacoco.minimo.branches` no `pom.xml`).
+
+O GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw clean verify` em todo PR e push para `develop` e `main`, publica a cobertura no resumo da execução (e o relatório como artefato) e, nos PRs, barra dependência nova ou atualizada com vulnerabilidade conhecida de gravidade moderada ou maior (`dependency-review-action`). O CodeQL (`.github/workflows/codeql.yml`) procura falhas de segurança no Java e nos workflows a cada PR, push e toda segunda-feira; os achados ficam na aba **Security**. As actions ficam fixadas pelo SHA do commit, com a versão em comentário, e o Dependabot (`.github/dependabot.yml`) abre toda segunda-feira PRs para a `develop` atualizando as dependências do Maven e as actions.
 
 ## Configuração
 

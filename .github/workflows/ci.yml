@@ -30,6 +30,25 @@ jobs:
       - name: Build e testes
         run: ./mvnw -B clean verify
 
+      # O verify já falha se a cobertura ficar abaixo do mínimo do pom.xml; aqui só publica o resultado.
+      - name: Resumo da cobertura
+        if: always()
+        run: |
+          csv=target/site/jacoco/jacoco.csv
+          [ -f "$csv" ] || exit 0
+          # Colunas do CSV: 6/7 = branches perdidos/cobertos, 8/9 = linhas perdidas/cobertas.
+          awk -F, 'NR>1 { bi+=$6; bc+=$7; li+=$8; lc+=$9 }
+            END { printf "### Cobertura (JaCoCo)\n\n| Linhas | Branches |\n|---|---|\n| %.1f%% | %.1f%% |\n", 100*lc/(li+lc), 100*bc/(bi+bc) }' "$csv" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Relatório de cobertura
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cobertura-jacoco
+          path: target/site/jacoco/
+          if-no-files-found: ignore
+          retention-days: 14
+
   # Barra o PR que adiciona ou atualiza dependência com vulnerabilidade conhecida.
   dependency-review:
     if: github.event_name == 'pull_request'
