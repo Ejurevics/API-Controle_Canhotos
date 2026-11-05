@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -71,9 +72,9 @@ public class Usuario {
 		registrar(Acao.CRIADO, null);
 	}
 
-	/** Login é guardado e comparado sem espaços nas pontas e em minúsculas. */
+	/** Login é guardado e comparado sem espaços nas pontas e em minúsculas, com a mesma regra em qualquer idioma do servidor. */
 	public static String normalizarLogin(String login) {
-		return login == null ? null : login.strip().toLowerCase();
+		return login == null ? null : login.strip().toLowerCase(Locale.ROOT);
 	}
 
 	/** Também invalida os tokens já emitidos; reativar não os devolve. Já inativo, não muda nada. */
