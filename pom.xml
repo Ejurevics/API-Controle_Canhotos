@@ -23,6 +23,7 @@
 		<!-- Cobertura mínima exigida no verify (medida em 2026-11-05: 97,4% das linhas e 94,8% dos branches). -->
 		<jacoco.minimo.linhas>0.95</jacoco.minimo.linhas>
 		<jacoco.minimo.branches>0.90</jacoco.minimo.branches>
+		<spotbugs-plugin.version>4.10.5.0</spotbugs-plugin.version>
 	</properties>
 
 	<dependencies>
@@ -149,6 +150,25 @@
 								</rule>
 							</rules>
 						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>${spotbugs-plugin.version}</version>
+				<configuration>
+					<effort>Max</effort>
+					<threshold>Low</threshold>
+					<xmlOutput>true</xmlOutput>
+					<excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
+				</configuration>
+				<executions>
+					<execution>
+						<id>analise-estatica</id>
+						<goals>
+							<goal>check</goal>
+						</goals>
 					</execution>
 				</executions>
 			</plugin>
