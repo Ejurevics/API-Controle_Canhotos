@@ -359,3 +359,11 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Histórico da gestão de usuários (quem criou, desativou, reativou, mudou o perfil ou a senha).
 - [x] Cache curto da credencial na checagem do token ([ADR 0005](docs/adr/0005-cache-curto-da-credencial.md)).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
+
+## Segurança
+
+Vulnerabilidades devem ser reportadas de forma privada, como descrito em [SECURITY.md](SECURITY.md).
+
+## Licença
+
+[MIT](LICENSE) © 2026 Enzo Jurevics
