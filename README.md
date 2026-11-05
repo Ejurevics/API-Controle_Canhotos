@@ -287,7 +287,7 @@ Com o Docker rodando:
 
 Os testes de integração sobem um PostgreSQL descartável via Testcontainers.
 
-O GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw clean verify` em todo PR e push para `develop` e `main`. As actions ficam fixadas pelo SHA do commit, com a versão em comentário, e o Dependabot (`.github/dependabot.yml`) abre toda segunda-feira PRs para a `develop` atualizando as dependências do Maven e as actions.
+O GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw clean verify` em todo PR e push para `develop` e `main` e, nos PRs, barra dependência nova ou atualizada com vulnerabilidade conhecida de gravidade moderada ou maior (`dependency-review-action`). O CodeQL (`.github/workflows/codeql.yml`) procura falhas de segurança no Java e nos workflows a cada PR, push e toda segunda-feira; os achados ficam na aba **Security**. As actions ficam fixadas pelo SHA do commit, com a versão em comentário, e o Dependabot (`.github/dependabot.yml`) abre toda segunda-feira PRs para a `develop` atualizando as dependências do Maven e as actions.
 
 ## Configuração
 
@@ -330,7 +330,8 @@ src/main/java/br/com/controlecanhotos/
 src/main/resources/
 ├── application.yml
 └── db/migration/  Migrations Flyway (V1__, V2__...)
-.github/workflows/ci.yml  CI: build e testes a cada PR
+.github/workflows/ci.yml  CI: build, testes e revisão de dependências a cada PR
+.github/workflows/codeql.yml  Análise de segurança (CodeQL) do Java e dos workflows
 .github/dependabot.yml    Atualização semanal das dependências (Maven) e das actions
 Dockerfile         Build multi-stage (JDK para compilar, JRE para rodar)
 docker-compose.yml App + PostgreSQL com healthcheck
