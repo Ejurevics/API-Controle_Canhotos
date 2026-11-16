@@ -55,6 +55,12 @@ public class AnexoCanhoto {
 	@Column(updatable = false)
 	private String enviadoPor;
 
+	private OffsetDateTime removidoEm;
+
+	private String removidoPor;
+
+	private String motivoRemocao;
+
 	protected AnexoCanhoto() {
 	}
 
@@ -64,6 +70,17 @@ public class AnexoCanhoto {
 		this.tipo = tipo;
 		this.tamanhoBytes = tamanhoBytes;
 		this.sha256 = sha256;
+	}
+
+	public boolean isAtivo() {
+		return removidoEm == null;
+	}
+
+	/** Remoção lógica (ADR 0006): some das consultas, mas os dados e os bytes ficam no banco. */
+	void remover(String login, String motivo) {
+		this.removidoEm = OffsetDateTime.now();
+		this.removidoPor = login;
+		this.motivoRemocao = motivo;
 	}
 
 	public Long getId() {
@@ -96,5 +113,17 @@ public class AnexoCanhoto {
 
 	public String getEnviadoPor() {
 		return enviadoPor;
+	}
+
+	public OffsetDateTime getRemovidoEm() {
+		return removidoEm;
+	}
+
+	public String getRemovidoPor() {
+		return removidoPor;
+	}
+
+	public String getMotivoRemocao() {
+		return motivoRemocao;
 	}
 }
