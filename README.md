@@ -365,6 +365,7 @@ spotbugs-exclude.xml  Exclusões justificadas do SpotBugs
 - [x] Histórico da gestão de usuários (quem criou, desativou, reativou, mudou o perfil ou a senha).
 - [x] Cache curto da credencial na checagem do token ([ADR 0005](docs/adr/0005-cache-curto-da-credencial.md)).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
+- [ ] Anexar o comprovante do canhoto (foto ou PDF), com remoção lógica. Desenho em [ADR 0006](docs/adr/0006-anexar-comprovante-do-canhoto.md).
 
 ## Segurança
 
