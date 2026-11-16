@@ -3,6 +3,8 @@ package br.com.controlecanhotos.usuario;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
+import java.util.Locale;
+
 import org.junit.jupiter.api.Test;
 
 import br.com.controlecanhotos.historico.HistoricoUsuario;
@@ -47,5 +49,18 @@ class UsuarioTest {
 		assertThat(maria.getHistorico()).extracting(HistoricoUsuario::getAcao)
 				.containsExactly(Acao.CRIADO, Acao.DESATIVADO);
 		assertThat(maria.getVersaoCredencial()).isEqualTo(1);
+	}
+
+	@Test
+	void normalizaOLoginIgualEmQualquerIdiomaDoServidor() {
+		Locale original = Locale.getDefault();
+		try {
+			// Em turco, "I".toLowerCase() vira "ı" (i sem ponto) e "ADMIN" deixaria de achar "admin".
+			Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+
+			assertThat(Usuario.normalizarLogin("  ADMIN.Silva ")).isEqualTo("admin.silva");
+		} finally {
+			Locale.setDefault(original);
+		}
 	}
 }

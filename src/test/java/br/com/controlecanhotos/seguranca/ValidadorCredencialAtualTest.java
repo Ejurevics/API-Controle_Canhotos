@@ -87,4 +87,13 @@ class ValidadorCredencialAtualTest {
 		assertThat(validador.validate(token("0")).hasErrors()).isTrue();
 		verifyNoInteractions(usuarioRepository);
 	}
+
+	@Test
+	void recusaTokenSemLoginSemConsultarOBanco() {
+		Jwt semSub = Jwt.withTokenValue("t").header("alg", "HS256")
+				.claim(SegurancaConfig.CLAIM_VERSAO_CREDENCIAL, 0L).build();
+
+		assertThat(validador.validate(semSub).hasErrors()).isTrue();
+		verifyNoInteractions(usuarioRepository);
+	}
 }

@@ -2,7 +2,7 @@
 
 API REST para controle de coletas, cargas (CT-e) e devolução de canhotos (comprovantes de entrega assinados) em uma transportadora, com histórico de status por carga.
 
-**Versão atual: `v0.6.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas e várias NFs agrupadas por CT-e ([ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)), com validação da chave de acesso. Toda rota exige login (JWT, perfis ADMIN e OPERADOR, com gestão de usuários pela API, limite de tentativas, revogação de tokens e histórico da gestão; veja [Autenticação](#autenticação)), e os históricos registram quem fez cada mudança.
+**Versão atual: `v0.6.1`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas e várias NFs agrupadas por CT-e ([ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)), com validação da chave de acesso. Toda rota exige login (JWT, perfis ADMIN e OPERADOR, com gestão de usuários pela API, limite de tentativas, revogação de tokens e histórico da gestão; veja [Autenticação](#autenticação)), e os históricos registram quem fez cada mudança.
 
 ## Modelo de domínio
 
@@ -287,7 +287,10 @@ Com o Docker rodando:
 
 Os testes de integração sobem um PostgreSQL descartável via Testcontainers.
 
-O GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw clean verify` em todo PR e push para `develop` e `main`.
+O `./mvnw verify` mede a cobertura com o JaCoCo (relatório em `target/site/jacoco/index.html`) e falha se ela ficar abaixo de 95% das linhas ou 90% dos branches (propriedades `jacoco.minimo.linhas` e `jacoco.minimo.branches` no `pom.xml`).
+Também roda o SpotBugs (análise estática do bytecode à procura de bugs prováveis, com `effort` Max e `threshold` Low), que falha o build se encontrar algo. As exclusões ficam em `spotbugs-exclude.xml`, cada uma com justificativa. Os achados aparecem no log do build e em `target/spotbugsXml.xml`.
+
+O GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw clean verify` em todo PR e push para `develop` e `main`, publica a cobertura no resumo da execução (e o relatório como artefato) e, nos PRs, barra dependência nova ou atualizada com vulnerabilidade conhecida de gravidade moderada ou maior (`dependency-review-action`). O CodeQL (`.github/workflows/codeql.yml`) procura falhas de segurança no Java e nos workflows a cada PR, push e toda segunda-feira; os achados ficam na aba **Security**. As actions ficam fixadas pelo SHA do commit, com a versão em comentário, e o Dependabot (`.github/dependabot.yml`) abre toda segunda-feira PRs para a `develop` atualizando as dependências do Maven e as actions.
 
 ## Configuração
 
@@ -330,15 +333,18 @@ src/main/java/br/com/controlecanhotos/
 src/main/resources/
 ├── application.yml
 └── db/migration/  Migrations Flyway (V1__, V2__...)
-.github/workflows/ci.yml  CI: build e testes a cada PR
+.github/workflows/ci.yml  CI: build, testes e revisão de dependências a cada PR
+.github/workflows/codeql.yml  Análise de segurança (CodeQL) do Java e dos workflows
+.github/dependabot.yml    Atualização semanal das dependências (Maven) e das actions
 Dockerfile         Build multi-stage (JDK para compilar, JRE para rodar)
 docker-compose.yml App + PostgreSQL com healthcheck
 docs/adr/          Decisões de arquitetura (ADRs)
+spotbugs-exclude.xml  Exclusões justificadas do SpotBugs
 ```
 
 ## Fluxo de desenvolvimento
 
-- `main`: versões estáveis, marcadas com tag (`v0.6.0`). Só recebe a `develop` via PR de release, com merge commit.
+- `main`: versões estáveis, marcadas com tag (`v0.6.1`). Só recebe a `develop` via PR de release, com merge commit.
 - `develop`: integração. Recebe os PRs de feature, com squash.
 - Branches de trabalho nascem da `develop` (`feat/`, `fix/`, `chore/`, `docs/`, `refactor/`) e são apagadas após o merge.
 - Commits seguem Conventional Commits (`feat(coleta): adiciona ...`).
@@ -359,3 +365,11 @@ docs/adr/          Decisões de arquitetura (ADRs)
 - [x] Histórico da gestão de usuários (quem criou, desativou, reativou, mudou o perfil ou a senha).
 - [x] Cache curto da credencial na checagem do token ([ADR 0005](docs/adr/0005-cache-curto-da-credencial.md)).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
+
+## Segurança
+
+Vulnerabilidades devem ser reportadas de forma privada, como descrito em [SECURITY.md](SECURITY.md).
+
+## Licença
+
+[MIT](LICENSE) © 2026 Enzo Jurevics
