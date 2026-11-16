@@ -2,7 +2,7 @@
 
 API REST para controle de coletas, cargas (CT-e) e devolução de canhotos (comprovantes de entrega assinados) em uma transportadora, com histórico de status por carga.
 
-**Versão atual: `v0.6.0`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas e várias NFs agrupadas por CT-e ([ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)), com validação da chave de acesso. Toda rota exige login (JWT, perfis ADMIN e OPERADOR, com gestão de usuários pela API, limite de tentativas, revogação de tokens e histórico da gestão; veja [Autenticação](#autenticação)), e os históricos registram quem fez cada mudança.
+**Versão atual: `v0.6.1`.** O fluxo principal está pronto (coletas, cargas, canhotos e históricos), com listagens filtradas e paginadas e várias NFs agrupadas por CT-e ([ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md)), com validação da chave de acesso. Toda rota exige login (JWT, perfis ADMIN e OPERADOR, com gestão de usuários pela API, limite de tentativas, revogação de tokens e histórico da gestão; veja [Autenticação](#autenticação)), e os históricos registram quem fez cada mudança.
 
 ## Modelo de domínio
 
@@ -344,7 +344,7 @@ spotbugs-exclude.xml  Exclusões justificadas do SpotBugs
 
 ## Fluxo de desenvolvimento
 
-- `main`: versões estáveis, marcadas com tag (`v0.6.0`). Só recebe a `develop` via PR de release, com merge commit.
+- `main`: versões estáveis, marcadas com tag (`v0.6.1`). Só recebe a `develop` via PR de release, com merge commit.
 - `develop`: integração. Recebe os PRs de feature, com squash.
 - Branches de trabalho nascem da `develop` (`feat/`, `fix/`, `chore/`, `docs/`, `refactor/`) e são apagadas após o merge.
 - Commits seguem Conventional Commits (`feat(coleta): adiciona ...`).
