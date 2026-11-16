@@ -7,6 +7,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -35,6 +36,9 @@ public class Canhoto {
 
 	private static final ZoneId FUSO_REFERENCIA = ZoneId.of("America/Sao_Paulo");
 
+	/** Máximo de anexos ativos por canhoto (ADR 0006). */
+	public static final int MAXIMO_ANEXOS = 10;
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -53,6 +57,10 @@ public class Canhoto {
 	@OneToMany(mappedBy = "canhoto", cascade = CascadeType.ALL)
 	@OrderBy("registradoEm, id")
 	private List<HistoricoCanhoto> historico = new ArrayList<>();
+
+	@OneToMany(mappedBy = "canhoto", cascade = CascadeType.ALL)
+	@OrderBy("enviadoEm, id")
+	private List<AnexoCanhoto> anexos = new ArrayList<>();
 
 	@CreationTimestamp
 	@Column(updatable = false)
@@ -106,11 +114,38 @@ public class Canhoto {
 		this.observacao = observacao;
 	}
 
-	private void exigirCargaEntregue() {
-		if (notaFiscal.getCarga().getStatus() != StatusCarga.ENTREGUE) {
+	/**
+	 * Anexa um comprovante (ADR 0006): só com a carga ENTREGUE, até {@value #MAXIMO_ANEXOS} ativos e sem
+	 * repetir um arquivo já anexado. Os bytes são gravados à parte, pelo service.
+	 */
+	public AnexoCanhoto anexar(String nomeArquivo, TipoAnexo tipo, int tamanhoBytes, String sha256) {
+		exigirCargaEntregue("Comprovante só pode ser anexado");
+		List<AnexoCanhoto> ativos = getAnexosAtivos();
+		if (ativos.size() >= MAXIMO_ANEXOS) {
 			throw new RegraNegocioException(
-					"Canhoto só pode ser registrado com a carga ENTREGUE (status atual: %s)"
-							.formatted(notaFiscal.getCarga().getStatus()));
+					"O canhoto já tem %d anexos; remova um para enviar outro".formatted(MAXIMO_ANEXOS));
+		}
+		ativos.stream().filter(a -> a.getSha256().equals(sha256)).findFirst().ifPresent(a -> {
+			throw new RegraNegocioException(
+					"Este arquivo já está anexado ao canhoto (anexo %d)".formatted(a.getId()));
+		});
+		AnexoCanhoto anexo = new AnexoCanhoto(this, nomeArquivo, tipo, tamanhoBytes, sha256);
+		anexos.add(anexo);
+		return anexo;
+	}
+
+	public Optional<AnexoCanhoto> buscarAnexoAtivo(Long anexoId) {
+		return getAnexosAtivos().stream().filter(a -> a.getId().equals(anexoId)).findFirst();
+	}
+
+	private void exigirCargaEntregue() {
+		exigirCargaEntregue("Canhoto só pode ser registrado");
+	}
+
+	private void exigirCargaEntregue(String operacao) {
+		if (notaFiscal.getCarga().getStatus() != StatusCarga.ENTREGUE) {
+			throw new RegraNegocioException("%s com a carga ENTREGUE (status atual: %s)"
+					.formatted(operacao, notaFiscal.getCarga().getStatus()));
 		}
 	}
 
@@ -154,6 +189,11 @@ public class Canhoto {
 
 	public List<HistoricoCanhoto> getHistorico() {
 		return Collections.unmodifiableList(historico);
+	}
+
+	/** Anexos ativos, na ordem de envio. A remoção lógica (ADR 0006, item 8) passa a filtrar os removidos. */
+	public List<AnexoCanhoto> getAnexosAtivos() {
+		return Collections.unmodifiableList(anexos);
 	}
 
 	public OffsetDateTime getCriadoEm() {
