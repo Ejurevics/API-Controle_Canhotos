@@ -250,4 +250,66 @@ class CanhotoTest {
 
 		assertThat(canhoto.getHistorico().getLast().isDataFuturaConfirmada()).isFalse();
 	}
+
+	private static String sha(int n) {
+		return "%064d".formatted(n);
+	}
+
+	@Test
+	void anexaComprovanteComCargaEntregue() {
+		Canhoto canhoto = novoCanhoto();
+
+		AnexoCanhoto anexo = canhoto.anexar("canhoto.jpg", TipoAnexo.JPEG, 1024, sha(1));
+
+		assertThat(canhoto.getAnexosAtivos()).containsExactly(anexo);
+		assertThat(anexo.getCanhoto()).isSameAs(canhoto);
+		assertThat(anexo.getNomeArquivo()).isEqualTo("canhoto.jpg");
+		assertThat(anexo.getTipo()).isEqualTo(TipoAnexo.JPEG);
+		assertThat(anexo.getTamanhoBytes()).isEqualTo(1024);
+		assertThat(anexo.getSha256()).isEqualTo(sha(1));
+		assertThat(canhoto.getStatus()).as("anexar não registra o canhoto").isEqualTo(StatusCanhoto.PENDENTE);
+	}
+
+	@Test
+	void anexarComCargaNaoEntregueLancaExcecao() {
+		Carga carga = novaCarga();
+		carga.alterarStatus(StatusCarga.COLETADA, null);
+		Canhoto canhoto = carga.getNotasFiscais().getFirst().getCanhoto();
+
+		assertThatThrownBy(() -> canhoto.anexar("canhoto.jpg", TipoAnexo.JPEG, 1024, sha(1)))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessage("Comprovante só pode ser anexado com a carga ENTREGUE (status atual: COLETADA)");
+		assertThat(canhoto.getAnexosAtivos()).isEmpty();
+	}
+
+	@Test
+	void anexarMesmoArquivoDuasVezesLancaExcecao() {
+		Canhoto canhoto = novoCanhoto();
+		canhoto.anexar("frente.jpg", TipoAnexo.JPEG, 1024, sha(1));
+
+		assertThatThrownBy(() -> canhoto.anexar("copia.jpg", TipoAnexo.JPEG, 1024, sha(1)))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessageStartingWith("Este arquivo já está anexado ao canhoto");
+		assertThat(canhoto.getAnexosAtivos()).hasSize(1);
+	}
+
+	@Test
+	void anexarAlemDoMaximoLancaExcecao() {
+		Canhoto canhoto = novoCanhoto();
+		for (int i = 0; i < Canhoto.MAXIMO_ANEXOS; i++) {
+			canhoto.anexar("foto" + i + ".jpg", TipoAnexo.JPEG, 1024, sha(i));
+		}
+
+		assertThatThrownBy(() -> canhoto.anexar("mais.jpg", TipoAnexo.JPEG, 1024, sha(99)))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessage("O canhoto já tem 10 anexos; remova um para enviar outro");
+		assertThat(canhoto.getAnexosAtivos()).hasSize(Canhoto.MAXIMO_ANEXOS);
+	}
+
+	@Test
+	void buscarAnexoAtivoPorId() {
+		Canhoto canhoto = novoCanhoto();
+
+		assertThat(canhoto.buscarAnexoAtivo(1L)).isEmpty();
+	}
 }

@@ -66,3 +66,8 @@ O comprovante chega de formas diferentes: foto tirada pelo motorista no celular 
 1. Este ADR.
 2. Envio, consulta e download (migration V10, `anexos` no `GET` do canhoto) e README.
 3. Remoção lógica e README.
+
+## Notas da implementação
+
+- **`413` acima do limite do multipart:** o Tomcat recusa o envio e, para conseguir entregar a resposta, precisa descartar o resto do corpo. O padrão dele é descartar até 2 MB e, acima disso, encerrar a conexão sem resposta; `server.tomcat.max-swallow-size` passou para 32 MB, para que um envio de até 32 MB receba o `413`.
+- **`Expect: 100-continue`:** quando o cliente manda esse cabeçalho (o `curl` faz isso em arquivos grandes) e a resposta não é 2xx, o Tomcat não descarta o resto do corpo e fecha a conexão (`Http11Processor.checkExpectationAndResponseStatus`). O cliente pode ver a conexão encerrada em vez do `413`. Envios dentro do limite não são afetados. Ajustar `continueResponseTiming` ou tirar o limite da requisição inteira não mudou esse comportamento; ficou documentado no README.

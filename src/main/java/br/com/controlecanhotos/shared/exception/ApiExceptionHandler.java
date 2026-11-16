@@ -13,6 +13,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -54,6 +55,18 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(RegraNegocioException.class)
 	ProblemDetail regraNegocio(RegraNegocioException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage());
+	}
+
+	@ExceptionHandler(ArquivoMuitoGrandeException.class)
+	ProblemDetail arquivoMuitoGrande(ArquivoMuitoGrandeException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, ex.getMessage());
+	}
+
+	/** O multipart recusou o envio antes de chegar ao controller (limite em AnexoConfig). */
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	ProblemDetail envioMuitoGrande(MaxUploadSizeExceededException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE,
+				"Arquivo maior que o limite permitido");
 	}
 
 	@ExceptionHandler(DataIntegrityViolationException.class)

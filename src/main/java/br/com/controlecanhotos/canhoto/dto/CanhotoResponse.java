@@ -14,7 +14,8 @@ public record CanhotoResponse(
 		StatusCanhoto status,
 		LocalDate dataRecebimento,
 		String observacao,
-		List<Registro> historico) {
+		List<Registro> historico,
+		List<AnexoResponse> anexos) {
 
 	public record Registro(StatusCanhoto statusAnterior, StatusCanhoto statusNovo, LocalDate dataRecebimento,
 			String observacao, boolean dataFuturaConfirmada, OffsetDateTime registradoEm, String registradoPor) {
@@ -28,6 +29,7 @@ public record CanhotoResponse(
 	public static CanhotoResponse de(Canhoto canhoto) {
 		return new CanhotoResponse(canhoto.getId(), canhoto.getNotaFiscal().getId(), canhoto.getStatus(),
 				canhoto.getDataRecebimento(), canhoto.getObservacao(),
-				canhoto.getHistorico().stream().map(Registro::de).toList());
+				canhoto.getHistorico().stream().map(Registro::de).toList(),
+				canhoto.getAnexosAtivos().stream().map(AnexoResponse::de).toList());
 	}
 }
