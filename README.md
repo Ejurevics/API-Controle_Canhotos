@@ -13,6 +13,7 @@ erDiagram
     NOTA_FISCAL ||--|| CANHOTO : possui
     CARGA ||--|{ HISTORICO_STATUS : registra
     CANHOTO ||--|{ HISTORICO_CANHOTO : registra
+    CANHOTO ||--o{ ANEXO_CANHOTO : comprova
 
     COLETA {
         bigint id PK
@@ -76,6 +77,18 @@ erDiagram
         boolean data_futura_confirmada
         timestamptz registrado_em
     }
+
+    ANEXO_CANHOTO {
+        bigint id PK
+        bigint canhoto_id FK
+        varchar nome_arquivo
+        varchar tipo "JPEG | PNG | PDF"
+        integer tamanho_bytes
+        char sha256
+        timestamptz enviado_em
+        varchar enviado_por
+        timestamptz removido_em
+    }
 ```
 
 - Cada carga corresponde a **um CT-e**, identificado pela chave de acesso de 44 dígitos (única no sistema e validada: modelo `57` nas posições 21 e 22 e dígito verificador em módulo 11), e agrupa **de 1 a N notas fiscais**. O status e o histórico de status são do CT-e; o peso total é a soma das NFs.
@@ -85,6 +98,7 @@ erDiagram
 - O canhoto só pode ser registrado (`RECEBIDO` ou `DIVERGENTE`) com o CT-e (carga) `ENTREGUE`.
 - Data de recebimento posterior à data atual (no fuso `America/Sao_Paulo`, independente do fuso do servidor) gera aviso e só é aceita com confirmação explícita, que fica marcada no histórico do canhoto.
 - O canhoto pode ser registrado mais de uma vez (ex.: `DIVERGENTE` e depois `RECEBIDO`). Cada registro fica em `historico_canhoto` com status, data e observação; o canhoto guarda só o estado atual.
+- O canhoto pode ter até 10 anexos com o comprovante (foto ou PDF), enviados com a carga `ENTREGUE`, antes ou depois do registro. Os bytes ficam em `anexo_canhoto_conteudo`, separados dos dados ([ADR 0006](docs/adr/0006-anexar-comprovante-do-canhoto.md)); veja [Comprovante do canhoto](#comprovante-do-canhoto).
 - Toda mudança de status da carga gera um registro em `historico_status`, e toda mudança de situação da coleta, em `historico_situacao_coleta` (`historico` em `GET /coletas/{id}`). Coletas anteriores à v0.5.0 começam com um registro da situação em que estavam, sem situação anterior.
 - Cada registro de histórico guarda o login de quem fez a mudança (`alteradoPor` na carga e na coleta, `registradoPor` no canhoto), tirado do token. Os registros iniciais ficam com quem criou a coleta. Registros gravados antes da v0.5.0 ficam com o campo nulo.
 - Cargas criadas antes do agrupamento por CT-e foram migradas com uma chave de acesso **provisória** (prefixo `99` + id, `chaveProvisoria: true`). Ela é corrigida com `PATCH /cargas/{id}/chave-acesso`, que aceita só chave válida e ainda não usada e só vale para chave provisória (a definitiva não muda); `GET /cargas?chaveProvisoria=true` lista as pendentes. A carga guarda a correção: `correcaoChave` em `GET /cargas/{id}` traz a chave provisória anterior, quando e por quem foi corrigida.
@@ -125,8 +139,11 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 | `PATCH` | `/cargas/{id}/status` | Altera o status da carga (`{"status": "...", "motivo": "..."}`); `motivo` é obrigatório para `OCORRENCIA` |
 | `PATCH` | `/cargas/{id}/chave-acesso` | Corrige a chave de acesso provisória de uma carga migrada (`{"chaveAcesso": "..."}`); a chave passa a ser definitiva |
 | `GET` | `/canhotos` | Lista canhotos, um por NF (ex.: pendentes por cliente ou período), com paginação |
-| `GET` | `/notas-fiscais/{id}/canhoto` | Busca o canhoto da NF com o histórico de registros |
+| `GET` | `/notas-fiscais/{id}/canhoto` | Busca o canhoto da NF com o histórico de registros e os anexos |
 | `POST` | `/notas-fiscais/{id}/canhoto/registros` | Registra o canhoto da NF como `RECEBIDO` ou `DIVERGENTE` |
+| `POST` | `/notas-fiscais/{id}/canhoto/anexos` | Anexa o comprovante (multipart, campo `arquivo`; `201` + `Location`) |
+| `GET` | `/notas-fiscais/{id}/canhoto/anexos/{anexoId}/arquivo` | Baixa o arquivo de um anexo |
+| `POST` | `/notas-fiscais/{id}/canhoto/anexos/{anexoId}/remocao` | Remove o anexo, sem apagar (`{"motivo": "..."}`, `204`). Quem enviou ou ADMIN |
 | `POST` | `/auth/login` | Entra com login e senha e recebe o token JWT (rota pública) |
 | `PATCH` | `/auth/senha` | O usuário logado troca a própria senha (`{"senhaAtual": "...", "novaSenha": "..."}`, `204`) |
 | `POST` | `/usuarios` | Cria um usuário (`{"login", "nome", "senha", "perfil"}`, `201` + `Location`). Só ADMIN |
@@ -153,8 +170,8 @@ No Swagger, use o botão **Authorize** e cole o token.
 
 | Perfil | Pode |
 |---|---|
-| `OPERADOR` | Coletas, cargas e canhotos: criar, consultar, listar, alterar status e situação, registrar canhoto. Trocar a própria senha |
-| `ADMIN` | Tudo do `OPERADOR`, mais corrigir a chave de acesso provisória (`PATCH /cargas/{id}/chave-acesso`) e gerenciar usuários (`/usuarios`) |
+| `OPERADOR` | Coletas, cargas e canhotos: criar, consultar, listar, alterar status e situação, registrar canhoto, anexar o comprovante e remover os anexos que enviou. Trocar a própria senha |
+| `ADMIN` | Tudo do `OPERADOR`, mais corrigir a chave de acesso provisória (`PATCH /cargas/{id}/chave-acesso`), gerenciar usuários (`/usuarios`) e remover anexos enviados por qualquer usuário |
 
 Sem token, ou com token inválido, expirado ou revogado, a resposta é `401`; com perfil sem permissão, `403`. O token vale `JWT_EXPIRACAO` (1 hora por padrão). Login inexistente, usuário inativo e senha errada respondem igual (`401`, "Login ou senha inválidos").
 
@@ -205,6 +222,23 @@ Registro do canhoto de uma NF (`observacao` obrigatória na `DIVERGENTE`; `dataF
 
 Se a data for posterior a hoje (fuso `America/Sao_Paulo`), a primeira tentativa responde `409` com `confirmacaoNecessaria: true`. O cliente avisa o usuário e reenvia com `dataFuturaConfirmada: true`.
 
+### Comprovante do canhoto
+
+```bash
+curl -s -X POST http://localhost:8080/notas-fiscais/1/canhoto/anexos \
+  -H 'Authorization: Bearer eyJ...' -F 'arquivo=@canhoto-1001.jpg'
+# {"id":1,"nomeArquivo":"canhoto-1001.jpg","tipoConteudo":"image/jpeg","tamanhoBytes":2483112,"enviadoEm":"...","enviadoPor":"maria.silva"}
+
+curl -s -OJ http://localhost:8080/notas-fiscais/1/canhoto/anexos/1/arquivo -H 'Authorization: Bearer eyJ...'
+```
+
+- Tipos aceitos: JPEG, PNG e PDF, reconhecidos pelo conteúdo do arquivo (o `Content-Type` e a extensão enviados são ignorados). Outro tipo, ou arquivo vazio, responde `422`.
+- Até `ANEXO_TAMANHO_MAXIMO` (5 MB por padrão) por arquivo; acima, `413`. Exceção: um cliente que manda `Expect: 100-continue` (o `curl` faz isso em arquivos grandes) pode ver a conexão encerrada em vez do `413`, porque nesse caso o Tomcat responde e fecha a conexão sem ler o resto do arquivo. No `curl`, `-H 'Expect:'` desliga o cabeçalho.
+- Só com a carga `ENTREGUE` (senão `422`); até 10 anexos por canhoto; o mesmo arquivo (mesmo conteúdo) não entra duas vezes no mesmo canhoto (`422`).
+- `GET /notas-fiscais/{id}/canhoto` traz `anexos` com os dados de cada um (sem o conteúdo). O download sai sempre como `attachment`, com o nome original.
+- O `Location` do `201` aponta para o download do arquivo.
+- Remoção (`POST .../anexos/{anexoId}/remocao`): só quem enviou o anexo ou um ADMIN (outro OPERADOR recebe `403`), com motivo obrigatório (até 500 caracteres, `400` sem ele), em qualquer status da carga. O anexo some do `GET` do canhoto e o download responde `404`, mas fica no banco com quem removeu, quando e o motivo. Removido, deixa de contar no limite de 10 e o mesmo arquivo pode ser enviado de novo.
+
 Exemplo de `POST /coletas` com um CT-e de duas NFs (`emitenteCnpj` e `serieNotaFiscal` são opcionais em cada NF):
 
 ```json
@@ -232,9 +266,10 @@ Erros seguem o formato `ProblemDetail` (RFC 9457):
 |---|---|
 | `400` | Dados inválidos (campo a campo em `erros`) |
 | `401` | Sem token, token inválido ou expirado, ou login com credenciais inválidas |
-| `403` | Perfil sem permissão para a operação |
+| `403` | Perfil sem permissão para a operação, ou remoção de anexo enviado por outro usuário |
 | `404` | Recurso não encontrado |
 | `409` | Confirmação necessária (`confirmacaoNecessaria: true`) ou violação de integridade |
+| `413` | Arquivo do comprovante acima de `ANEXO_TAMANHO_MAXIMO` |
 | `422` | Regra de negócio violada (ex.: CT-e já cadastrado, NF repetida no mesmo CT-e) |
 | `429` | Muitas tentativas de login com erro; `Retry-After` diz em quantos segundos tentar de novo |
 
@@ -312,6 +347,7 @@ Copie `.env.example` para `.env` e preencha. O `docker compose` lê o `.env` aut
 | `LOGIN_MAX_FALHAS_POR_LOGIN` | `5` | Falhas de login permitidas por login dentro da janela |
 | `LOGIN_MAX_FALHAS_POR_IP` | `20` | Falhas de login permitidas por IP dentro da janela |
 | `LOGIN_JANELA` | `PT15M` | Janela do limite de tentativas, em ISO-8601 (`PT15M` = 15 minutos) |
+| `ANEXO_TAMANHO_MAXIMO` | `5MB` | Tamanho máximo do arquivo do comprovante do canhoto (ex.: `5MB`, `512KB`) |
 
 Perfis Spring:
 
@@ -325,7 +361,7 @@ src/main/java/br/com/controlecanhotos/
 ├── coleta/        Coleta, situação, service, controller e DTOs
 ├── carga/         Carga (CT-e), status, regras de transição e DTOs
 ├── notafiscal/    Nota fiscal (de 1 a N por CT-e) e DTOs
-├── canhoto/       Canhoto (um por NF), status, service, controllers e DTOs
+├── canhoto/       Canhoto (um por NF), status, anexos do comprovante, services, controllers e DTOs
 ├── historico/     Histórico de situação da coleta, de status da carga e de registros do canhoto
 ├── usuario/       Usuário, perfil (ADMIN, OPERADOR) e gestão de usuários
 ├── seguranca/     Login, emissão e validação do JWT, regras de acesso e ADMIN inicial
@@ -365,6 +401,7 @@ spotbugs-exclude.xml  Exclusões justificadas do SpotBugs
 - [x] Histórico da gestão de usuários (quem criou, desativou, reativou, mudou o perfil ou a senha).
 - [x] Cache curto da credencial na checagem do token ([ADR 0005](docs/adr/0005-cache-curto-da-credencial.md)).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
+- [x] Anexar o comprovante do canhoto (foto ou PDF), com remoção lógica. Desenho em [ADR 0006](docs/adr/0006-anexar-comprovante-do-canhoto.md).
 
 ## Segurança
 

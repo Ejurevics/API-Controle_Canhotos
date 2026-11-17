@@ -16,6 +16,12 @@ spring:
         jdbc:
           time_zone: UTC
 
+server:
+  tomcat:
+    # Envio recusado por tamanho (anexo do canhoto): o Tomcat descarta até isto do corpo para conseguir responder 413;
+    # acima, encerra a conexão sem resposta. Com "Expect: 100-continue" o Tomcat não descarta e sempre encerra.
+    max-swallow-size: 32MB
+
 management:
   endpoints:
     web:
@@ -39,6 +45,9 @@ app:
       max-falhas-por-login: ${LOGIN_MAX_FALHAS_POR_LOGIN:5}
       max-falhas-por-ip: ${LOGIN_MAX_FALHAS_POR_IP:20}
       janela: ${LOGIN_JANELA:PT15M}
+  # Comprovante do canhoto (ADR 0006): tamanho máximo por arquivo, também usado como limite do multipart.
+  anexo:
+    tamanho-maximo: ${ANEXO_TAMANHO_MAXIMO:5MB}
 
 ---
 spring:
