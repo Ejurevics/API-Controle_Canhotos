@@ -74,6 +74,11 @@ public class AnexoCanhotoService {
 		return new ArquivoAnexo(anexo.getNomeArquivo(), anexo.getTipo(), conteudo);
 	}
 
+	@Transactional
+	public void remover(Long notaFiscalId, Long anexoId, String motivo, String login, boolean admin) {
+		obterCanhoto(notaFiscalId).removerAnexo(anexoId, login, admin, motivo);
+	}
+
 	/**
 	 * Nome guardado: só o que vem depois da última barra (alguns navegadores mandam o caminho), sem caracteres
 	 * de controle e com até {@value #TAMANHO_MAXIMO_NOME} caracteres. Sem nome, usa "comprovante" + extensão.

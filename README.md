@@ -143,6 +143,7 @@ Concluir a coleta exige que todas as cargas estejam `ENTREGUE` ou `DEVOLVIDA`. C
 | `POST` | `/notas-fiscais/{id}/canhoto/registros` | Registra o canhoto da NF como `RECEBIDO` ou `DIVERGENTE` |
 | `POST` | `/notas-fiscais/{id}/canhoto/anexos` | Anexa o comprovante (multipart, campo `arquivo`; `201` + `Location`) |
 | `GET` | `/notas-fiscais/{id}/canhoto/anexos/{anexoId}/arquivo` | Baixa o arquivo de um anexo |
+| `POST` | `/notas-fiscais/{id}/canhoto/anexos/{anexoId}/remocao` | Remove o anexo, sem apagar (`{"motivo": "..."}`, `204`). Quem enviou ou ADMIN |
 | `POST` | `/auth/login` | Entra com login e senha e recebe o token JWT (rota pública) |
 | `PATCH` | `/auth/senha` | O usuário logado troca a própria senha (`{"senhaAtual": "...", "novaSenha": "..."}`, `204`) |
 | `POST` | `/usuarios` | Cria um usuário (`{"login", "nome", "senha", "perfil"}`, `201` + `Location`). Só ADMIN |
@@ -169,8 +170,8 @@ No Swagger, use o botão **Authorize** e cole o token.
 
 | Perfil | Pode |
 |---|---|
-| `OPERADOR` | Coletas, cargas e canhotos: criar, consultar, listar, alterar status e situação, registrar canhoto. Trocar a própria senha |
-| `ADMIN` | Tudo do `OPERADOR`, mais corrigir a chave de acesso provisória (`PATCH /cargas/{id}/chave-acesso`) e gerenciar usuários (`/usuarios`) |
+| `OPERADOR` | Coletas, cargas e canhotos: criar, consultar, listar, alterar status e situação, registrar canhoto, anexar o comprovante e remover os anexos que enviou. Trocar a própria senha |
+| `ADMIN` | Tudo do `OPERADOR`, mais corrigir a chave de acesso provisória (`PATCH /cargas/{id}/chave-acesso`), gerenciar usuários (`/usuarios`) e remover anexos enviados por qualquer usuário |
 
 Sem token, ou com token inválido, expirado ou revogado, a resposta é `401`; com perfil sem permissão, `403`. O token vale `JWT_EXPIRACAO` (1 hora por padrão). Login inexistente, usuário inativo e senha errada respondem igual (`401`, "Login ou senha inválidos").
 
@@ -236,6 +237,7 @@ curl -s -OJ http://localhost:8080/notas-fiscais/1/canhoto/anexos/1/arquivo -H 'A
 - Só com a carga `ENTREGUE` (senão `422`); até 10 anexos por canhoto; o mesmo arquivo (mesmo conteúdo) não entra duas vezes no mesmo canhoto (`422`).
 - `GET /notas-fiscais/{id}/canhoto` traz `anexos` com os dados de cada um (sem o conteúdo). O download sai sempre como `attachment`, com o nome original.
 - O `Location` do `201` aponta para o download do arquivo.
+- Remoção (`POST .../anexos/{anexoId}/remocao`): só quem enviou o anexo ou um ADMIN (outro OPERADOR recebe `403`), com motivo obrigatório (até 500 caracteres, `400` sem ele), em qualquer status da carga. O anexo some do `GET` do canhoto e o download responde `404`, mas fica no banco com quem removeu, quando e o motivo. Removido, deixa de contar no limite de 10 e o mesmo arquivo pode ser enviado de novo.
 
 Exemplo de `POST /coletas` com um CT-e de duas NFs (`emitenteCnpj` e `serieNotaFiscal` são opcionais em cada NF):
 
@@ -264,7 +266,7 @@ Erros seguem o formato `ProblemDetail` (RFC 9457):
 |---|---|
 | `400` | Dados inválidos (campo a campo em `erros`) |
 | `401` | Sem token, token inválido ou expirado, ou login com credenciais inválidas |
-| `403` | Perfil sem permissão para a operação |
+| `403` | Perfil sem permissão para a operação, ou remoção de anexo enviado por outro usuário |
 | `404` | Recurso não encontrado |
 | `409` | Confirmação necessária (`confirmacaoNecessaria: true`) ou violação de integridade |
 | `413` | Arquivo do comprovante acima de `ANEXO_TAMANHO_MAXIMO` |
@@ -399,7 +401,7 @@ spotbugs-exclude.xml  Exclusões justificadas do SpotBugs
 - [x] Histórico da gestão de usuários (quem criou, desativou, reativou, mudou o perfil ou a senha).
 - [x] Cache curto da credencial na checagem do token ([ADR 0005](docs/adr/0005-cache-curto-da-credencial.md)).
 - [x] Agrupar NFs por CT-e (uma carga com várias NFs). Desenho em [ADR 0001](docs/adr/0001-agrupar-nfs-por-cte.md).
-- [ ] Anexar o comprovante do canhoto (foto ou PDF), com remoção lógica: envio, consulta e download prontos; falta a remoção. Desenho em [ADR 0006](docs/adr/0006-anexar-comprovante-do-canhoto.md).
+- [x] Anexar o comprovante do canhoto (foto ou PDF), com remoção lógica. Desenho em [ADR 0006](docs/adr/0006-anexar-comprovante-do-canhoto.md).
 
 ## Segurança
 

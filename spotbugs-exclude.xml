@@ -15,6 +15,21 @@
 		<Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
 	</Match>
 
+	<!--
+		O SpotBugs decide que uma classe é mutável pelo nome dos métodos ("remove...", entre outros), e por isso
+		passou a ver Canhoto (removerAnexo) e AnexoCanhotoService (remover) como mutáveis. Canhoto é entidade JPA:
+		as associações que apontam para ele (NotaFiscal, HistoricoCanhoto, AnexoCanhoto) são o grafo gerenciado
+		pelo Hibernate, e uma cópia quebraria esse grafo. AnexoCanhotoService é um bean Spring singleton e sem
+		estado, injetado no controller.
+	-->
+	<Match>
+		<Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+		<Or>
+			<Field type="br.com.controlecanhotos.canhoto.Canhoto"/>
+			<Field type="br.com.controlecanhotos.canhoto.AnexoCanhotoService"/>
+		</Or>
+	</Match>
+
 	<!-- HttpSecurity.build() declara "throws Exception"; a assinatura do @Bean vem da API do Spring Security. -->
 	<Match>
 		<Class name="br.com.controlecanhotos.seguranca.SegurancaConfig"/>

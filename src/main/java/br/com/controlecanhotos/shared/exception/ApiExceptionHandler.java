@@ -40,6 +40,11 @@ public class ApiExceptionHandler {
 				"Seu perfil não tem permissão para esta operação");
 	}
 
+	@ExceptionHandler(OperacaoNaoPermitidaException.class)
+	ProblemDetail operacaoNaoPermitida(OperacaoNaoPermitidaException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+	}
+
 	@ExceptionHandler(RecursoNaoEncontradoException.class)
 	ProblemDetail recursoNaoEncontrado(RecursoNaoEncontradoException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());

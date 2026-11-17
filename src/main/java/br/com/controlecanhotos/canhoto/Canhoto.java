@@ -16,6 +16,8 @@ import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.historico.HistoricoCanhoto;
 import br.com.controlecanhotos.notafiscal.NotaFiscal;
 import br.com.controlecanhotos.shared.exception.ConfirmacaoNecessariaException;
+import br.com.controlecanhotos.shared.exception.OperacaoNaoPermitidaException;
+import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -134,6 +136,23 @@ public class Canhoto {
 		return anexo;
 	}
 
+	/**
+	 * Remove um anexo ativo, sem apagar (ADR 0006): só quem o enviou ou um ADMIN, com motivo. Não depende do
+	 * status da carga.
+	 */
+	public AnexoCanhoto removerAnexo(Long anexoId, String login, boolean admin, String motivo) {
+		AnexoCanhoto anexo = buscarAnexoAtivo(anexoId)
+				.orElseThrow(() -> new RecursoNaoEncontradoException("Anexo não encontrado: " + anexoId));
+		if (!admin && !login.equals(anexo.getEnviadoPor())) {
+			throw new OperacaoNaoPermitidaException("Só quem enviou o anexo ou um ADMIN pode removê-lo");
+		}
+		if (motivo == null || motivo.isBlank()) {
+			throw new RegraNegocioException("Motivo é obrigatório para remover o anexo");
+		}
+		anexo.remover(login, motivo.strip());
+		return anexo;
+	}
+
 	public Optional<AnexoCanhoto> buscarAnexoAtivo(Long anexoId) {
 		return getAnexosAtivos().stream().filter(a -> a.getId().equals(anexoId)).findFirst();
 	}
@@ -191,9 +210,9 @@ public class Canhoto {
 		return Collections.unmodifiableList(historico);
 	}
 
-	/** Anexos ativos, na ordem de envio. A remoção lógica (ADR 0006, item 8) passa a filtrar os removidos. */
+	/** Anexos não removidos, na ordem de envio. */
 	public List<AnexoCanhoto> getAnexosAtivos() {
-		return Collections.unmodifiableList(anexos);
+		return anexos.stream().filter(AnexoCanhoto::isAtivo).toList();
 	}
 
 	public OffsetDateTime getCriadoEm() {

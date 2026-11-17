@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import br.com.controlecanhotos.Cte;
 import br.com.controlecanhotos.carga.Carga;
@@ -18,6 +19,8 @@ import br.com.controlecanhotos.carga.StatusCarga;
 import br.com.controlecanhotos.coleta.Coleta;
 import br.com.controlecanhotos.historico.HistoricoCanhoto;
 import br.com.controlecanhotos.shared.exception.ConfirmacaoNecessariaException;
+import br.com.controlecanhotos.shared.exception.OperacaoNaoPermitidaException;
+import br.com.controlecanhotos.shared.exception.RecursoNaoEncontradoException;
 import br.com.controlecanhotos.shared.exception.RegraNegocioException;
 
 class CanhotoTest {
@@ -306,10 +309,89 @@ class CanhotoTest {
 		assertThat(canhoto.getAnexosAtivos()).hasSize(Canhoto.MAXIMO_ANEXOS);
 	}
 
-	@Test
-	void buscarAnexoAtivoPorId() {
-		Canhoto canhoto = novoCanhoto();
+	/** Sem banco nem auditoria no teste de unidade: id e autor vêm à mão. */
+	private static AnexoCanhoto anexarComo(Canhoto canhoto, long id, String login, int sha) {
+		AnexoCanhoto anexo = canhoto.anexar("foto" + id + ".jpg", TipoAnexo.JPEG, 1024, sha(sha));
+		ReflectionTestUtils.setField(anexo, "id", id);
+		ReflectionTestUtils.setField(anexo, "enviadoPor", login);
+		return anexo;
+	}
 
+	@Test
+	void quemEnviouRemoveOAnexoSemApagar() {
+		Canhoto canhoto = novoCanhoto();
+		AnexoCanhoto anexo = anexarComo(canhoto, 1L, "maria", 1);
+		AnexoCanhoto outro = anexarComo(canhoto, 2L, "maria", 2);
+
+		canhoto.removerAnexo(1L, "maria", false, "  Foto do canhoto errado  ");
+
+		assertThat(anexo.isAtivo()).isFalse();
+		assertThat(anexo.getRemovidoEm()).isNotNull();
+		assertThat(anexo.getRemovidoPor()).isEqualTo("maria");
+		assertThat(anexo.getMotivoRemocao()).isEqualTo("Foto do canhoto errado");
+		assertThat(canhoto.getAnexosAtivos()).containsExactly(outro);
 		assertThat(canhoto.buscarAnexoAtivo(1L)).isEmpty();
+		assertThat(canhoto.buscarAnexoAtivo(2L)).contains(outro);
+	}
+
+	@Test
+	void anexoRemovidoNaoContaNoLimiteNemNaDuplicata() {
+		Canhoto canhoto = novoCanhoto();
+		for (int i = 1; i <= Canhoto.MAXIMO_ANEXOS; i++) {
+			anexarComo(canhoto, i, "maria", i);
+		}
+		canhoto.removerAnexo(1L, "maria", false, "Duplicado");
+
+		AnexoCanhoto denovo = canhoto.anexar("foto1.jpg", TipoAnexo.JPEG, 1024, sha(1));
+
+		assertThat(canhoto.getAnexosAtivos()).hasSize(Canhoto.MAXIMO_ANEXOS).contains(denovo);
+	}
+
+	@Test
+	void adminRemoveAnexoDeOutroUsuarioMesmoComCargaEmOcorrencia() {
+		Canhoto canhoto = novoCanhoto();
+		AnexoCanhoto anexo = anexarComo(canhoto, 1L, "maria", 1);
+		canhoto.getNotaFiscal().getCarga().alterarStatus(StatusCarga.OCORRENCIA, "Cliente contestou a entrega");
+
+		canhoto.removerAnexo(1L, "admin", true, "Enviado na NF errada");
+
+		assertThat(anexo.isAtivo()).isFalse();
+		assertThat(anexo.getRemovidoPor()).isEqualTo("admin");
+	}
+
+	@Test
+	void outroOperadorNaoRemove() {
+		Canhoto canhoto = novoCanhoto();
+		AnexoCanhoto anexo = anexarComo(canhoto, 1L, "maria", 1);
+
+		assertThatThrownBy(() -> canhoto.removerAnexo(1L, "joao", false, "Não gostei"))
+				.isInstanceOf(OperacaoNaoPermitidaException.class)
+				.hasMessage("Só quem enviou o anexo ou um ADMIN pode removê-lo");
+		assertThat(anexo.isAtivo()).isTrue();
+	}
+
+	@Test
+	void removerExigeMotivo() {
+		Canhoto canhoto = novoCanhoto();
+		anexarComo(canhoto, 1L, "maria", 1);
+
+		assertThatThrownBy(() -> canhoto.removerAnexo(1L, "maria", false, "   "))
+				.isInstanceOf(RegraNegocioException.class)
+				.hasMessage("Motivo é obrigatório para remover o anexo");
+		assertThatThrownBy(() -> canhoto.removerAnexo(1L, "maria", false, null))
+				.isInstanceOf(RegraNegocioException.class);
+	}
+
+	@Test
+	void removerAnexoInexistenteOuJaRemovidoLancaExcecao() {
+		Canhoto canhoto = novoCanhoto();
+		anexarComo(canhoto, 1L, "maria", 1);
+		canhoto.removerAnexo(1L, "maria", false, "Errado");
+
+		assertThatThrownBy(() -> canhoto.removerAnexo(1L, "maria", false, "De novo"))
+				.isInstanceOf(RecursoNaoEncontradoException.class)
+				.hasMessage("Anexo não encontrado: 1");
+		assertThatThrownBy(() -> canhoto.removerAnexo(9L, "admin", true, "Qualquer"))
+				.isInstanceOf(RecursoNaoEncontradoException.class);
 	}
 }

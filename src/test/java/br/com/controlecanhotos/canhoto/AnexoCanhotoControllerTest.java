@@ -1,6 +1,7 @@
 package br.com.controlecanhotos.canhoto;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -19,8 +20,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.jayway.jsonpath.JsonPath;
 
@@ -164,6 +168,69 @@ class AnexoCanhotoControllerTest {
 		mvc.perform(multipart("/notas-fiscais/{id}/canhoto/anexos", nota)
 				.file(new MockMultipartFile("outro", "a.jpg", "image/jpeg", TipoAnexoTest.JPEG)))
 				.andExpect(status().isBadRequest());
+	}
+
+	/** Cria um OPERADOR de verdade: o login de quem envia e de quem remove tem FK para usuario(login). */
+	private RequestPostProcessor operador(String prefixo) throws Exception {
+		String login = prefixo + "." + NUMERO_NF.incrementAndGet();
+		mvc.perform(post("/usuarios").contentType(MediaType.APPLICATION_JSON).content("""
+				{"login": "%s", "nome": "Operador %s", "senha": "senha-de-teste", "perfil": "OPERADOR"}
+				""".formatted(login, login))).andExpect(status().isCreated());
+		return jwt().jwt(j -> j.subject(login)).authorities(new SimpleGrantedAuthority("ROLE_OPERADOR"));
+	}
+
+	private ResultActions remover(long nota, long anexo, String motivo, RequestPostProcessor como) throws Exception {
+		MockHttpServletRequestBuilder pedido = post("/notas-fiscais/{id}/canhoto/anexos/{anexo}/remocao", nota, anexo)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(motivo == null ? "{}" : "{\"motivo\": \"%s\"}".formatted(motivo));
+		return mvc.perform(como == null ? pedido : pedido.with(como));
+	}
+
+	@Test
+	void quemEnviouRemoveEOAnexoSomeDasConsultas() throws Exception {
+		long nota = criarNotaEntregue();
+		RequestPostProcessor maria = operador("maria");
+		RequestPostProcessor joao = operador("joao");
+		long anexo = id(mvc.perform(multipart("/notas-fiscais/{id}/canhoto/anexos", nota)
+				.file(new MockMultipartFile("arquivo", "errado.jpg", "image/jpeg", TipoAnexoTest.JPEG)).with(maria))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.enviadoPor").value(containsString("maria."))));
+
+		remover(nota, anexo, "Não é meu", joao)
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.detail").value("Só quem enviou o anexo ou um ADMIN pode removê-lo"));
+
+		remover(nota, anexo, "Foto do canhoto errado", maria).andExpect(status().isNoContent());
+
+		mvc.perform(get("/notas-fiscais/{id}/canhoto", nota)).andExpect(jsonPath("$.anexos.length()").value(0));
+		mvc.perform(get("/notas-fiscais/{id}/canhoto/anexos/{anexo}/arquivo", nota, anexo))
+				.andExpect(status().isNotFound());
+		remover(nota, anexo, "De novo", maria).andExpect(status().isNotFound());
+
+		// O mesmo arquivo volta a entrar depois de removido (o índice único só vale entre os ativos).
+		enviar(nota, "certo.jpg", "image/jpeg", TipoAnexoTest.JPEG).andExpect(status().isCreated());
+	}
+
+	@Test
+	void adminRemoveAnexoDeOutroUsuario() throws Exception {
+		long nota = criarNotaEntregue();
+		long anexo = id(mvc.perform(multipart("/notas-fiscais/{id}/canhoto/anexos", nota)
+				.file(new MockMultipartFile("arquivo", "a.pdf", "application/pdf", TipoAnexoTest.PDF))
+				.with(operador("ana"))));
+
+		remover(nota, anexo, "Enviado na NF errada", null).andExpect(status().isNoContent());
+	}
+
+	@Test
+	void removerExigeMotivo() throws Exception {
+		long nota = criarNotaEntregue();
+		long anexo = id(enviar(nota, "a.png", "image/png", TipoAnexoTest.PNG));
+
+		remover(nota, anexo, null, null)
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.erros.motivo").exists());
+		remover(nota, anexo, "x".repeat(501), null).andExpect(status().isBadRequest());
+		remover(nota, anexo, "   ", null).andExpect(status().isBadRequest());
 	}
 
 	@Test
